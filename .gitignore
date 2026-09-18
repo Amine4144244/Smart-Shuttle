@@ -12,3 +12,6 @@ uploads/*
 coverage/
 .turbo/
 .vercel
+.serena/
+.agents/
+*.timestamp-*.mjs

@@ -40,6 +40,7 @@ api.interceptors.response.use(
 export default api;
 
 export const authApi = {
+  register: (data: any) => api.post('/auth/register', data),
   syncUser: (data: any) => api.post('/auth/sync', data),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data: any) => api.put('/auth/profile', data),

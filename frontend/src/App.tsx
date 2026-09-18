@@ -39,6 +39,7 @@ import ParticipantBookings from '@/pages/participant/Bookings';
 import ParticipantMyTickets from '@/pages/participant/MyTickets';
 import ParticipantTrack from '@/pages/participant/Track';
 import Profile from '@/pages/Profile';
+import LandingPage from '@/pages/LandingPage';
 
 function PrivateRoute({ children, roles }: { children: React.ReactNode; roles?: Role[] }) {
   const { isAuthenticated, user } = useAuthStore();
@@ -61,9 +62,20 @@ export default function App() {
   useEffect(() => { initialize(); }, [initialize]);
 
   if (isLoading) {
+    const isParticipantOrLanding =
+      typeof window !== 'undefined' &&
+      (window.location.pathname === '/' ||
+        window.location.pathname.startsWith('/participant') ||
+        window.location.pathname.startsWith('/login') ||
+        window.location.pathname.startsWith('/register'));
+
     return (
       <div className="flex h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <div
+          className={`h-8 w-8 animate-spin rounded-full border-4 ${
+            isParticipantOrLanding ? 'border-[#ffac00]' : 'border-primary'
+          } border-t-transparent`}
+        />
       </div>
     );
   }
@@ -122,7 +134,7 @@ export default function App() {
         </Route>
 
         <Route path="/403" element={<Forbidden />} />
-        <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       <OfflineDetector />

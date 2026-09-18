@@ -4,56 +4,91 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Base Surface - Titanium Light */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary Brand - Electric Cobalt */
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --primary-glow: 217 91% 60%;
+
+    /* Secondary & Muted */
+    --secondary: 214 32% 93%;
+    --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 214 32% 93%;
+    --accent-foreground: 222 47% 11%;
+
+    /* Destructive & Borders */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214.3 31.8% 90%;
+    --input: 214.3 31.8% 90%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
-    --sidebar: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
+    --radius: 0.625rem;
+
+    /* Transit Telemetry Colors */
+    --transit-live: 160 84% 39%;
+    --transit-scheduled: 199 89% 48%;
+    --transit-delayed: 38 92% 50%;
+    --transit-completed: 215 16% 47%;
+    --transit-cancelled: 0 84% 60%;
+
+    /* Sidebar - Light Mode Matching Surrounding Cards */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-accent: 210 40% 94%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214.3 31.8% 90%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Base Surface - Deep Obsidian */
+    --background: 224 71% 4%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 224 50% 7.5%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 224 50% 7.5%;
     --popover-foreground: 210 40% 98%;
+
+    /* Primary Brand - Electric Azure Glow */
     --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary-foreground: 224 71% 4%;
+    --primary-glow: 213 94% 68%;
+
+    /* Secondary & Muted */
+    --secondary: 217.2 32.6% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
+    --muted: 217.2 32.6% 13%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 217.2 32.6% 15%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+    /* Destructive & Borders */
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --sidebar: 0 0% 100%;
-    --sidebar-foreground: 222.2 84% 4.9%;
-    --sidebar-accent: 210 40% 96.1%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --border: 217.2 32.6% 16%;
+    --input: 217.2 32.6% 16%;
+    --ring: 217.2 91.2% 59.8%;
+
+    /* Transit Telemetry Colors */
+    --transit-live: 158 75% 48%;
+    --transit-scheduled: 199 89% 58%;
+    --transit-delayed: 38 92% 55%;
+    --transit-completed: 215 20% 65%;
+    --transit-cancelled: 0 72% 51%;
+
+    /* Sidebar */
+    --sidebar: 224 71% 5.5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-accent: 217.2 32.6% 15%;
+    --sidebar-accent-foreground: 210 40% 98%;
   }
 }
 
@@ -61,47 +96,228 @@
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
+  html, body {
+    @apply bg-background text-foreground antialiased font-sans;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  /* Telemetry / Tabular numbers */
+  .font-tabular {
+    font-family: var(--font-mono, "JetBrains Mono", monospace);
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @layer components {
+  /* Telemetry & Stats Cards */
   .stats-card {
-    @apply rounded-xl border bg-card p-6 shadow-sm transition-all hover:shadow-md;
+    @apply rounded-xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:border-primary/40 hover:shadow-md;
   }
   .glass-card {
-    @apply rounded-xl border bg-card/80 backdrop-blur-sm shadow-sm;
+    @apply rounded-xl border border-border/70 bg-card/85 backdrop-blur-md shadow-sm transition-all;
   }
   .page-container {
-    @apply w-full max-w-7xl mx-auto px-4 md:px-6;
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6;
   }
   .section-title {
-    @apply text-2xl font-bold tracking-tight;
+    @apply text-xl md:text-2xl font-bold tracking-tight text-foreground;
   }
+  
+  /* Transit Status Badges */
   .badge-status {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase;
   }
+  .badge-transit-live {
+    @apply bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30;
+  }
+  .badge-transit-scheduled {
+    @apply bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30;
+  }
+  .badge-transit-delayed {
+    @apply bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30;
+  }
+  .badge-transit-completed {
+    @apply bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30;
+  }
+  .badge-transit-cancelled {
+    @apply bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/30;
+  }
+
+  /* Boarding pass ticket styling */
+  .ticket-card {
+    @apply relative overflow-hidden rounded-2xl border border-border bg-card shadow-lg transition-all duration-300 hover:shadow-xl;
+  }
+  .ticket-perforation {
+    @apply relative my-4 border-t-2 border-dashed border-border/80 before:absolute before:-left-6 before:-top-3 before:h-6 before:w-6 before:rounded-full before:bg-background before:border-r before:border-border after:absolute after:-right-6 after:-top-3 after:h-6 after:w-6 after:rounded-full after:bg-background after:border-l after:border-border;
+  }
+
+  /* 21st.dev Inspired Background & Gradient Components */
+  .bg-grid-pattern {
+    background-size: 36px 36px;
+    background-image: 
+      linear-gradient(to right, hsl(var(--foreground) / 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.04) 1px, transparent 1px);
+  }
+  .bg-dot-pattern {
+    background-size: 24px 24px;
+    background-image: radial-gradient(circle, hsl(var(--foreground) / 0.07) 1px, transparent 1px);
+  }
+  .mask-radial-faded {
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 85%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 85%);
+  }
+  .mask-radial-hero {
+    mask-image: radial-gradient(circle at 50% 25%, black 40%, transparent 80%);
+    -webkit-mask-image: radial-gradient(circle at 50% 25%, black 40%, transparent 80%);
+  }
+
+  /* Glowing Animated Border Beam */
+  .border-beam {
+    position: relative;
+  }
+  .border-beam::after {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(
+      var(--beam-angle, 0deg),
+      transparent 20%,
+      hsl(var(--primary)) 45%,
+      hsl(var(--primary-glow)) 55%,
+      transparent 80%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    animation: rotate-beam 6s linear infinite;
+  }
+
+  /* Text Gradient Shimmer */
+  .text-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--primary-glow)) 40%,
+      hsl(var(--foreground)) 80%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer-text 5s ease-in-out infinite;
+  }
+}
+
+@keyframes rotate-beam {
+  0% {
+    --beam-angle: 0deg;
+  }
+  100% {
+    --beam-angle: 360deg;
+  }
+}
+
+@property --beam-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes shimmer-text {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-15px) scale(1.03);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(12px) scale(0.97);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 9s ease-in-out infinite;
+}
+.animate-float-reverse {
+  animation: float-reverse 11s ease-in-out infinite;
+}
+.animate-pulse-glow {
+  animation: pulse-glow 6s ease-in-out infinite;
+}
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+  transform-origin: center center;
 }
 
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 5px;
+    height: 5px;
   }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 2px;
+    background: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 4px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+    background: hsl(var(--muted-foreground) / 0.45);
   }
+}
+
+/* Stacking Context Isolation for Leaflet Maps */
+.leaflet-container {
+  z-index: 0 !important;
+  isolation: isolate;
+}
+.leaflet-pane {
+  z-index: 10 !important;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 20 !important;
 }

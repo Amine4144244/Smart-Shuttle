@@ -31,6 +31,39 @@ class AuthService {
     if (error) throw new AppError(error.message, 400);
   }
 
+  async register(data: { email: string; password: string; firstName: string; lastName: string; phone?: string; role?: string }) {
+    const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
+    if (existingUser) throw new AppError('An account with this email already exists', 400);
+
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: data.email,
+      password: data.password,
+      email_confirm: true,
+      user_metadata: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: data.role || 'EMPLOYEE',
+      },
+    });
+
+    if (authError) {
+      throw new AppError(authError.message, 400);
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        authId: authData.user.id,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone || null,
+        role: (data.role as any) || 'EMPLOYEE',
+      },
+    });
+
+    return user;
+  }
+
   async syncUser(authId: string, email: string, userMeta?: { firstName?: string; lastName?: string; role?: string }) {
     let user = await prisma.user.findUnique({ where: { authId } });
 

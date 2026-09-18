@@ -12,7 +12,9 @@ export default function ScanQr() {
   const navigate = useNavigate();
   const mountedRef = useRef(true);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const startingRef = useRef(false);
   const [pageState, setPageState] = useState<PageState>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
   const [result, setResult] = useState<any>(null);
   const [cameraError, setCameraError] = useState('');
   const [boardingMsg, setBoardingMsg] = useState('');
@@ -23,7 +25,7 @@ export default function ScanQr() {
   });
 
   const showSuccess = (data: any) => { setResult(data); setPageState('success'); setTimeout(() => { if (mountedRef.current) navigate('/driver/tracking'); }, 2000); };
-  const showError = (msg: string) => { setPageState('error'); setResult(null); setTimeout(() => { if (mountedRef.current) scanStart(); }, 2000); };
+  const showError = (msg: string) => { setErrorMsg(msg); setResult(null); setPageState('error'); setTimeout(() => { if (mountedRef.current) scanStart(); }, 2000); };
 
   const validateToken = async (token: string) => {
     setPageState('validating');
@@ -63,22 +65,21 @@ export default function ScanQr() {
     }
   };
 
-  const scanStart = async () => {
-    if (!mountedRef.current) return;
-    if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
-      try { await scannerRef.current.clear(); } catch {}
-      scannerRef.current = null;
+  const scanStop = async () => {
+    const s = scannerRef.current;
+    scannerRef.current = null;
+    if (s) {
+      try { await s.stop(); } catch {}
+      try { await s.clear(); } catch {}
     }
-    setPageState('starting-camera');
   };
 
-  const scanStop = async () => {
-    if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
-      try { await scannerRef.current.clear(); } catch {}
-      scannerRef.current = null;
-    }
+  const scanStart = async () => {
+    if (!mountedRef.current || startingRef.current) return;
+    setErrorMsg('');
+    await scanStop();
+    if (!mountedRef.current) return;
+    setPageState('starting-camera');
   };
 
   const scanFromImage = async (file: File) => {
@@ -110,7 +111,9 @@ export default function ScanQr() {
   useEffect(() => {
     if (pageState !== 'starting-camera') return;
     const start = async () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || startingRef.current) return;
+      startingRef.current = true;
+      try {
       if (!window.isSecureContext) {
         setCameraError('Camera requires HTTPS. Access via https:// or localhost only.');
         setPageState('camera-error');
@@ -132,7 +135,7 @@ export default function ScanQr() {
       }
       const describeError = (e: any) => `${e?.name || 'Error'}: ${e?.message || e?.toString() || 'Unknown'}`;
       try {
-        const testStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        const testStream = await navigator.mediaDevices.getUserMedia({ video: true });
         testStream.getTracks().forEach(t => t.stop());
       } catch (e: any) {
         const name = e?.name || '';
@@ -150,39 +153,60 @@ export default function ScanQr() {
         return;
       }
       await new Promise(r => setTimeout(r, 300));
-      const scanner = new Html5Qrcode('qr-reader-container');
-      scannerRef.current = scanner;
       const config = {
         fps: 10,
         qrbox: { width: 360, height: 360 },
         experimentalFeatures: { useBarCodeDetectorIfSupported: true },
       };
-       const onScan = (decodedText: string) => {
-         if (!mountedRef.current) return;
-         scanner.stop().catch(() => {});
-         handleScan(decodedText);
-       };
-      let lastErr = '';
-      const facingModes: (string | MediaTrackConstraints)[] = [
-        { facingMode: { ideal: 'environment' } },
-        'environment',
-        { facingMode: { ideal: 'user' } },
-        'user',
-      ];
-      for (const constraints of facingModes) {
+      const onScan = async (decodedText: string) => {
+        if (!mountedRef.current) return;
+        await scanStop();
+        handleScan(decodedText);
+      };
+
+      let firstErr = '';
+      let cameraOptions: any[] = [];
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+          const backCam = cameras.find(c => c.label.toLowerCase().includes('back') || c.label.toLowerCase().includes('rear') || c.label.toLowerCase().includes('environment'));
+          if (backCam) cameraOptions.push(backCam.id);
+          cameras.forEach(c => {
+            if (!cameraOptions.includes(c.id)) cameraOptions.push(c.id);
+          });
+        }
+      } catch {}
+
+      cameraOptions.push(
+        { facingMode: 'environment' },
+        { facingMode: 'user' },
+        { facingMode: { exact: 'environment' } },
+        { facingMode: { exact: 'user' } }
+      );
+
+      for (const constraints of cameraOptions) {
+        if (!mountedRef.current) return;
+        const attempt = new Html5Qrcode('qr-reader-container');
         try {
-          await scanner.start(constraints as any, config, onScan, () => {});
+          await attempt.start(constraints, config, onScan, () => {});
+          scannerRef.current = attempt;
           if (mountedRef.current) setPageState('scanning');
           return;
-        } catch (e: any) { lastErr = describeError(e); }
+        } catch (e: any) {
+          if (!firstErr) firstErr = describeError(e);
+          try { await attempt.clear(); } catch {}
+        }
       }
       if (!mountedRef.current) return;
-      if (lastErr.toLowerCase().includes('notallowed') || lastErr.toLowerCase().includes('permission')) {
+      if (firstErr.toLowerCase().includes('notallowed') || firstErr.toLowerCase().includes('permission')) {
         setCameraError('Camera permission blocked. Please allow camera access in your browser settings and try again.');
       } else {
-        setCameraError(`Camera error: ${lastErr}`);
+        setCameraError(`Camera error: ${firstErr}`);
       }
       setPageState('camera-error');
+      } finally {
+        startingRef.current = false;
+      }
     };
     start();
   }, [pageState]);
@@ -394,7 +418,7 @@ export default function ScanQr() {
           {pageState === 'error' && (
             <div className="animate-shake rounded-2xl border border-red-400/40 bg-red-500/20 p-5 backdrop-blur-md">
               <XCircle className="mx-auto mb-2 h-12 w-12 text-red-400" />
-              <p className="text-base font-semibold text-red-300">Invalid QR code</p>
+              <p className="text-base font-semibold text-red-300">{errorMsg || 'Invalid QR code'}</p>
               <p className="mt-2 text-xs text-red-300/50">Restarting scanner...</p>
             </div>
           )}

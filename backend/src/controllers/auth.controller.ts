@@ -3,6 +3,17 @@ import { authService } from '../services/auth.service';
 import { AppError } from '../middleware/error.middleware';
 
 export class AuthController {
+  async register(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, password, firstName, lastName, phone, role } = req.body;
+      if (!email || !password || !firstName || !lastName) {
+        throw new AppError('Email, password, first name, and last name are required', 400);
+      }
+      const user = await authService.register({ email, password, firstName, lastName, phone, role });
+      res.status(201).json(user);
+    } catch (error) { next(error); }
+  }
+
   async syncUser(req: Request, res: Response, next: NextFunction) {
     try {
       const { authId, email, ...userMeta } = req.body;

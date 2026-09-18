@@ -2,27 +2,48 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ticketsApi } from '@/services/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuthStore } from '@/store/authStore';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { QrCode, Bus, MapPin, Clock, Calendar, User, Phone, FileText } from 'lucide-react';
-import { getStatusColor } from '@/lib/utils';
+import { QrCode, Bus, MapPin, Clock, Calendar, User, Phone, FileText, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import SafeQRCode from '@/components/shared/SafeQRCode';
 
+const getBadgeVariant = (status: string): 'default' | 'secondary' | 'outline' | 'live' | 'scheduled' | 'delayed' | 'completed' | 'cancelled' => {
+  switch (status) {
+    case 'CONFIRMED':
+    case 'CHECKED_IN':
+    case 'BOARDED':
+      return 'live';
+    case 'PENDING':
+      return 'scheduled';
+    case 'COMPLETED':
+      return 'completed';
+    case 'CANCELLED':
+    case 'REJECTED':
+    case 'NO_SHOW':
+      return 'cancelled';
+    default:
+      return 'secondary';
+  }
+};
+
 const statusLabels: Record<string, string> = {
-  PENDING: 'En attente',
-  CONFIRMED: 'Confirmé',
-  CHECKED_IN: 'Embarqué',
-  BOARDED: 'À bord',
-  COMPLETED: 'Terminé',
-  CANCELLED: 'Annulé',
-  REJECTED: 'Rejeté',
-  NO_SHOW: 'Absent',
+  PENDING: 'Pending Confirmation',
+  CONFIRMED: 'Confirmed & Ready',
+  CHECKED_IN: 'Checked In / Boarded',
+  BOARDED: 'Onboard Shuttle',
+  COMPLETED: 'Trip Completed',
+  CANCELLED: 'Cancelled',
+  REJECTED: 'Rejected',
+  NO_SHOW: 'No Show',
 };
 
 export default function TicketDetails() {
   const { id } = useParams<{ id: string }>();
-  const [showQR, setShowQR] = useState(false);
+  const [showQR, setShowQR] = useState(true);
+  const { user } = useAuthStore();
+  const isParticipant = user?.role === 'EMPLOYEE' || user?.role === 'PARTICIPANT';
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', id],
@@ -30,99 +51,223 @@ export default function TicketDetails() {
     enabled: !!id,
   });
 
-  if (isLoading) return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-    </div>
-  );
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[450px] space-y-3">
+        <div className={`animate-spin rounded-full h-10 w-10 border-2 ${isParticipant ? 'border-[#ffac00]' : 'border-primary'} border-t-transparent`} />
+        <span className={`text-xs font-mono uppercase tracking-wider ${isParticipant ? 'text-[#ffac00]' : 'text-muted-foreground'}`}>Loading Boarding Pass...</span>
+      </div>
+    );
+  }
 
-  if (!ticket) return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-      <FileText className="h-12 w-12 mb-4 opacity-50" />
-      <p>Billet introuvable.</p>
-      <Button variant="link" asChild><Link to="/participant/tickets">Retour</Link></Button>
-    </div>
-  );
+  if (!ticket) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[450px] text-muted-foreground max-w-md mx-auto text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+          <FileText className="h-8 w-8 text-muted-foreground/60" />
+        </div>
+        <div>
+          <h2 className="text-lg font-bold text-foreground">Pass Not Found</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            The requested boarding pass could not be retrieved or has expired.
+          </p>
+        </div>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/participant/tickets" className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Return to Passes
+          </Link>
+        </Button>
+      </div>
+    );
+  }
 
   const t = ticket;
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold">Mon billet</h1>
+    <div className="space-y-6 max-w-2xl mx-auto py-2">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" asChild className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+          <Link to="/participant/tickets">
+            <ArrowLeft className="h-4 w-4" /> Back to My Passes
+          </Link>
+        </Button>
+        <span className="text-xs font-mono text-muted-foreground tracking-wider uppercase">
+          E-Pass #{t.reservationCode}
+        </span>
+      </div>
 
-      <Card>
-        <CardHeader><CardTitle>Informations du billet</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-between"><span className="text-muted-foreground">Code</span><span className="font-mono font-medium">{t.reservationCode}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Statut</span><Badge className={getStatusColor(t.status)}>{statusLabels[t.status] || t.status}</Badge></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Date</span><span>{new Date(t.date).toLocaleDateString('fr-FR')}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Heure</span><span>{new Date(t.time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span></div>
-          {t.passengerCount && <div className="flex justify-between"><span className="text-muted-foreground">Passagers</span><span>{t.passengerCount}</span></div>}
-          {t.contactPhone && <div className="flex justify-between"><span className="text-muted-foreground">Téléphone</span><span>{t.contactPhone}</span></div>}
-          {t.notes && <div><span className="text-muted-foreground text-sm">Notes</span><p className="text-sm">{t.notes}</p></div>}
-        </CardContent>
-      </Card>
+      {/* Main Boarding Pass Card */}
+      <div className="ticket-card rounded-3xl overflow-hidden shadow-xl border border-border/80 bg-card">
+        {/* Ticket Header Banner */}
+        <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-6 border-b border-white/10 relative overflow-hidden">
+          <div className="absolute right-0 top-0 bottom-0 w-48 bg-gradient-to-l from-primary/20 to-transparent pointer-events-none" />
+          <div className="flex items-start justify-between relative z-10">
+            <div>
+              <span className="text-[10px] font-mono tracking-widest text-primary-foreground/70 uppercase">
+                Official Transit Pass
+              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-white mt-1">
+                {t.event?.name || 'Event Shuttle Route'}
+              </h1>
+            </div>
+            <Badge variant={getBadgeVariant(t.status)} className="shadow-lg">
+              {statusLabels[t.status] || t.status}
+            </Badge>
+          </div>
+        </div>
 
-      <Card>
-        <CardHeader><CardTitle>Participant</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex items-center gap-2"><User className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{t.participant?.firstName} {t.participant?.lastName}</span></div>
-          {t.participant?.email && <div className="text-sm text-muted-foreground">{t.participant.email}</div>}
-          {t.participant?.phone && <div className="text-sm text-muted-foreground">{t.participant.phone}</div>}
-        </CardContent>
-      </Card>
+        {/* QR Code Section */}
+        <div className="p-6 bg-muted/10 border-b border-border/40 flex flex-col items-center text-center">
+          <div className="p-3 bg-white rounded-2xl shadow-md ring-1 ring-black/5 mb-3">
+            <SafeQRCode value={t.qrCode || t.reservationCode} size={180} />
+          </div>
+          <div className="flex items-center gap-1.5 text-xs font-mono font-semibold text-foreground">
+            <ShieldCheck className="h-4 w-4 text-emerald-500" />
+            <span>VERIFIED PASS: {t.reservationCode}</span>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Present this QR code to the driver upon boarding
+          </p>
+        </div>
 
-      {t.event && (
-        <Card>
-          <CardHeader><CardTitle>Événement</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <p className="font-medium">{t.event.name}</p>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Calendar className="h-4 w-4" /><span>{new Date(t.event.date).toLocaleDateString('fr-FR')}</span></div>
-            {t.event.startTime && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Clock className="h-4 w-4" /><span>{t.event.startTime} - {t.event.endTime}</span></div>}
-            {t.event.address && <div className="flex items-center gap-2 text-sm text-muted-foreground"><MapPin className="h-4 w-4" /><span>{t.event.address}</span></div>}
-          </CardContent>
-        </Card>
-      )}
+        {/* Boarding Details */}
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider flex items-center gap-1">
+                <Calendar className="h-3 w-3" /> Travel Date
+              </span>
+              <p className="text-sm font-semibold text-foreground font-mono mt-0.5">
+                {new Date(t.date).toLocaleDateString()}
+              </p>
+            </div>
 
-      {t.trip && (
-        <Card>
-          <CardHeader><CardTitle>Navette</CardTitle></CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex items-center gap-2"><Bus className="h-4 w-4 text-muted-foreground" /><span className="font-medium">{t.trip.name || t.trip.vehicle?.busNumber || 'Navette'}</span></div>
-            {t.trip.driver?.user && <div className="text-sm text-muted-foreground">Chauffeur: {t.trip.driver.user.firstName} {t.trip.driver.user.lastName}</div>}
-            {t.trip.route && <div className="text-sm text-muted-foreground">{t.trip.route.origin} → {t.trip.route.destination}</div>}
-            {t.trip.departureTime && <div className="text-sm text-muted-foreground">Départ: {new Date(t.trip.departureTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>}
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Statut navette</span><Badge className={getStatusColor(t.trip.status)}>{t.trip.status}</Badge></div>
-          </CardContent>
-        </Card>
-      )}
+            <div>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider flex items-center gap-1">
+                <Clock className="h-3 w-3" /> Departure Time
+              </span>
+              <p className="text-sm font-semibold text-foreground font-mono mt-0.5">
+                {new Date(t.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
 
-      {t.pickupPoint && (
-        <Card>
-          <CardHeader><CardTitle>Point de départ</CardTitle></CardHeader>
-          <CardContent>
-            <p className="font-medium">{t.pickupPoint.name}</p>
-            {t.pickupPoint.address && <p className="text-sm text-muted-foreground">{t.pickupPoint.address}</p>}
-          </CardContent>
-        </Card>
-      )}
+            <div>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider flex items-center gap-1">
+                <User className="h-3 w-3" /> Party Size
+              </span>
+              <p className="text-sm font-semibold text-foreground font-mono mt-0.5">
+                {t.passengerCount || 1} {(t.passengerCount || 1) === 1 ? 'Passenger' : 'Passengers'}
+              </p>
+            </div>
+          </div>
 
-      <Card>
-        <CardHeader><CardTitle>QR Code</CardTitle></CardHeader>
-        <CardContent className="flex flex-col items-center gap-4">
-          {!showQR ? (
-            <>
-              <p className="text-sm text-muted-foreground">Scannez ce QR code pour afficher votre billet</p>
-              <Button onClick={() => setShowQR(true)} className="gap-2"><QrCode className="h-4 w-4" /> Afficher QR Code</Button>
-            </>
-          ) : (
-            <div className="bg-white p-4 rounded-lg">
-              <SafeQRCode value={t.qrCode} size={200} />
-              <p className="text-center text-xs text-muted-foreground mt-2">{t.reservationCode}</p>
+          {/* Passenger Info Card */}
+          <div className="p-4 rounded-xl bg-muted/30 border border-border/50 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                {t.participant?.firstName?.[0] || 'U'}
+              </div>
+              <div>
+                <p className="font-semibold text-foreground">
+                  {t.participant?.firstName} {t.participant?.lastName}
+                </p>
+                <p className="text-muted-foreground font-mono text-[11px]">
+                  {t.participant?.email}
+                </p>
+              </div>
+            </div>
+            {t.participant?.phone && (
+              <span className="font-mono text-muted-foreground">
+                {t.participant.phone}
+              </span>
+            )}
+          </div>
+
+          {/* Pickup Point & Destination */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono">
+              Route & Pickup Station
+            </h3>
+            <div className="p-4 rounded-xl bg-card border border-border/60 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                  <MapPin className="h-3.5 w-3.5" />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-mono text-emerald-600 font-semibold block">
+                    Designated Pickup Location
+                  </span>
+                  <p className="text-sm font-bold text-foreground">
+                    {t.pickupPoint?.name || t.event?.address || 'Main Pickup Point'}
+                  </p>
+                  {t.pickupPoint?.address && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t.pickupPoint.address}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {t.event?.address && (
+                <div className="flex items-start gap-3 pt-2 border-t border-border/40">
+                  <div className="w-6 h-6 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-[10px] uppercase font-mono text-blue-600 font-semibold block">
+                      Event Destination
+                    </span>
+                    <p className="text-sm font-bold text-foreground">
+                      {t.event.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t.event.address}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Assigned Shuttle Telemetry */}
+          {t.trip && (
+            <div className="space-y-3 pt-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground font-mono">
+                Assigned Shuttle
+              </h3>
+              <div className="p-4 rounded-xl bg-slate-950 text-white border border-slate-800 space-y-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                      <Bus className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-white text-sm">
+                        Bus {t.trip.vehicle?.busNumber || t.trip.name || 'Assigned'}
+                      </p>
+                      {t.trip.vehicle?.plateNumber && (
+                        <span className="font-mono text-[10px] text-slate-400">
+                          {t.trip.vehicle.plateNumber}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <Badge variant="live">
+                    {t.trip.status}
+                  </Badge>
+                </div>
+
+                {t.trip.driver?.user && (
+                  <div className="flex items-center justify-between text-xs text-slate-300 pt-2 border-t border-slate-800 font-mono">
+                    <span>Driver: {t.trip.driver.user.firstName} {t.trip.driver.user.lastName}</span>
+                    {t.trip.driver.phone && <span>{t.trip.driver.phone}</span>}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
-}
+}

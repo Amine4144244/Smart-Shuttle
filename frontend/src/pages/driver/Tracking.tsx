@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { getStatusColor, formatTime } from '@/lib/utils';
 import TrackingMap from '@/components/maps/TrackingMap';
 import { MapPoint } from '@/services/googleMaps';
-import { Play, Square, Navigation, Gauge, Timer, Users, MapPin, AlertTriangle, CheckCircle2, QrCode } from 'lucide-react';
+import { Play, Square, Navigation, Gauge, Timer, Users, MapPin, AlertTriangle, CheckCircle2, QrCode, Bus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type TripStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'DELAYED' | 'CANCELLED';
@@ -137,30 +137,60 @@ export default function DriverTracking() {
   const destPoint = trip?.route ? { lat: trip.route.destinationLat || 0, lng: trip.route.destinationLng || 0, name: trip.route.destination } : undefined;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-6 max-w-7xl mx-auto pb-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">GPS Tracking</h1>
-          <p className="text-muted-foreground">Share your live location</p>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+              <Navigation className="h-3 w-3" />
+              TELEMETRY HUD
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground mt-1.5 font-sans">
+            GPS Tracking Console
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Broadcast live shuttle coordinates and monitor passenger boarding
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm" onClick={() => navigate('/driver/scan-qr')}>
-            <QrCode className="mr-1 h-4 w-4" /> Scan QR
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            className="h-11 px-5 gap-2 font-semibold text-sm rounded-xl bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 transition-all"
+            onClick={() => navigate('/driver/scan-qr')}
+          >
+            <QrCode className="h-4 w-4" /> Scan QR
           </Button>
-          <Badge variant={gpsStatus === 'active' ? 'success' : gpsStatus === 'error' ? 'destructive' : 'secondary'}>
+
+          {gpsStatus === 'inactive' ? (
+            <Button
+              onClick={startGps}
+              className="h-11 px-5 gap-2 font-semibold text-sm rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 transition-all"
+            >
+              <Navigation className="h-4 w-4 animate-pulse" /> Start GPS
+            </Button>
+          ) : (
+            <Button
+              onClick={stopGps}
+              variant="destructive"
+              className="h-11 px-5 gap-2 font-semibold text-sm rounded-xl shadow-md shadow-destructive/25 transition-all"
+            >
+              <Square className="h-4 w-4" /> Stop GPS
+            </Button>
+          )}
+
+          <Badge
+            variant={gpsStatus === 'active' ? 'live' : gpsStatus === 'error' ? 'cancelled' : 'secondary'}
+            className="h-11 px-4 font-mono text-xs rounded-xl font-bold border shadow-xs"
+          >
             {gpsStatus === 'active' ? 'GPS Active' : gpsStatus === 'error' ? 'GPS Error' : 'GPS Off'}
           </Badge>
-          {gpsStatus === 'inactive' ? (
-            <Button onClick={startGps} size="sm"><Navigation className="mr-1 h-4 w-4" /> Start GPS</Button>
-          ) : (
-            <Button onClick={stopGps} variant="destructive" size="sm"><Square className="mr-1 h-4 w-4" /> Stop GPS</Button>
-          )}
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden border border-border/80 shadow-md rounded-2xl">
             <TrackingMap
               shuttlePosition={currentPos}
               shuttleHeading={currentHeading}
@@ -168,95 +198,111 @@ export default function DriverTracking() {
               destination={destPoint}
               stops={stopPoints}
               routePath={routePoints}
-              height="500px"
+              height="520px"
             />
           </Card>
         </div>
 
         <div className="space-y-4">
-          <Card>
-            <CardHeader><CardTitle>Trip Info</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status</span>
+          <Card className="border border-border/80 rounded-2xl shadow-sm">
+            <CardHeader className="pb-3 border-b border-border/50">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Bus className="h-4 w-4 text-primary" /> Active Trip Info
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-4 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">Status</span>
                 <Badge className={getStatusColor(trip?.status || 'SCHEDULED')}>
                   {(trip?.status || 'SCHEDULED').replace('_', ' ')}
                 </Badge>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Route</span>
-                <span className="text-right font-medium">{trip?.route?.name || '-'}</span>
+              <div className="flex justify-between items-center pt-1 border-t border-border/40">
+                <span className="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">Route</span>
+                <span className="text-right font-bold text-foreground truncate max-w-[180px]">{trip?.route?.name || '-'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Vehicle</span>
-                <span className="font-medium">{trip?.vehicle?.busNumber || '-'}</span>
+              <div className="flex justify-between items-center pt-1 border-t border-border/40">
+                <span className="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">Vehicle</span>
+                <span className="font-mono font-bold text-foreground">{trip?.vehicle?.busNumber || '-'}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Passengers</span>
-                <span className="font-medium">{trip?._count?.reservations || 0}</span>
+              <div className="flex justify-between items-center pt-1 border-t border-border/40">
+                <span className="text-muted-foreground font-mono uppercase tracking-wider text-[10px]">Passengers</span>
+                <span className="font-mono font-bold text-primary">{trip?._count?.reservations || 0} Boarded</span>
               </div>
             </CardContent>
           </Card>
 
           {gpsStatus === 'active' && (
-            <Card>
-              <CardHeader><CardTitle>Live Data</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Gauge className="h-6 w-6 text-primary shrink-0" />
-                  <div>
-                    <p className="text-2xl font-bold">{(currentSpeed * 3.6).toFixed(0)}</p>
-                    <p className="text-xs text-muted-foreground">km/h</p>
+            <Card className="border border-blue-500/30 bg-gradient-to-br from-card via-card to-blue-500/[0.05] rounded-2xl shadow-md">
+              <CardHeader className="pb-3 border-b border-border/50">
+                <CardTitle className="text-base font-bold flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <Gauge className="h-4 w-4 animate-pulse" /> Live Telemetry Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-muted/40 border border-border/60 flex items-center gap-3">
+                    <Gauge className="h-5 w-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-xl font-extrabold font-mono text-foreground">{(currentSpeed * 3.6).toFixed(0)}</p>
+                      <p className="text-[10px] uppercase font-mono text-muted-foreground">km/h speed</p>
+                    </div>
                   </div>
+
+                  {distance !== null && (
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/60 flex items-center gap-3">
+                      <MapPin className="h-5 w-5 text-emerald-500 shrink-0" />
+                      <div>
+                        <p className="text-xl font-extrabold font-mono text-foreground">{distance.toFixed(1)}</p>
+                        <p className="text-[10px] uppercase font-mono text-muted-foreground">km remaining</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {distance !== null && (
-                  <div className="flex items-center gap-4">
-                    <MapPin className="h-6 w-6 text-primary shrink-0" />
-                    <div>
-                      <p className="text-2xl font-bold">{distance.toFixed(1)}</p>
-                      <p className="text-xs text-muted-foreground">km remaining</p>
-                    </div>
-                  </div>
-                )}
+
                 {eta && (
-                  <div className="flex items-center gap-4">
-                    <Timer className="h-6 w-6 text-primary shrink-0" />
+                  <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-3">
+                    <Timer className="h-5 w-5 text-primary shrink-0" />
                     <div>
-                      <p className="text-2xl font-bold">{eta}</p>
-                      <p className="text-xs text-muted-foreground">Estimated arrival</p>
+                      <p className="text-lg font-bold font-mono text-foreground">{eta}</p>
+                      <p className="text-[10px] uppercase font-mono text-primary font-semibold">Estimated Arrival Time</p>
                     </div>
                   </div>
                 )}
-                <div>
-                  <div className="mb-1 flex justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">{progress}%</span>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between text-xs font-mono">
+                    <span className="text-muted-foreground">Route Progress</span>
+                    <span className="font-bold text-foreground">{progress}%</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                     <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
+
                 {currentPos && (
-                  <div className="text-xs text-muted-foreground">
-                    {currentPos[0].toFixed(6)}, {currentPos[1].toFixed(6)}
+                  <div className="text-[11px] font-mono text-muted-foreground text-center pt-1">
+                    GPS: {currentPos[0].toFixed(5)}, {currentPos[1].toFixed(5)}
                   </div>
                 )}
               </CardContent>
             </Card>
           )}
 
-          <Card>
-            <CardHeader><CardTitle>Actions</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
+          <Card className="border border-border/80 rounded-2xl shadow-sm">
+            <CardHeader className="pb-3 border-b border-border/50">
+              <CardTitle className="text-base font-bold">Operational Controls</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2.5 pt-4">
               {getStatusOptions(trip?.status || 'SCHEDULED').map((action) => (
                 <Button
                   key={action.label}
-                  className="w-full"
+                  className="w-full h-11 rounded-xl font-semibold text-sm justify-center gap-2 shadow-xs"
                   variant={action.status === 'COMPLETED' ? 'default' : 'outline'}
                   onClick={() => trip?.id && statusMutation.mutate({ id: trip.id, status: action.status })}
                   disabled={statusMutation.isPending}
                 >
-                  <action.icon className="mr-2 h-4 w-4" />
+                  <action.icon className="h-4 w-4" />
                   {action.label}
                 </Button>
               ))}
