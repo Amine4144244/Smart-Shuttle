@@ -118,10 +118,14 @@ export default function App() {
           <Route path="tracking" element={<DriverTracking />} />
         </Route>
 
-        <Route path="/driver/scan-qr" element={<PrivateRoute roles={['DRIVER']}><DriverScanQr /></PrivateRoute>} />
-        <Route path="/ticket/:id" element={<PrivateRoute><MainLayout /><TicketDetails /></PrivateRoute>} />
+        <Route path="/driver/scan-qr" element={<PrivateRoute roles={['DRIVER', 'SUPER_ADMIN']}><DriverScanQr /></PrivateRoute>} />
+        
+        <Route element={<PrivateRoute><MainLayout /></PrivateRoute>}>
+          <Route path="/ticket/:id" element={<TicketDetails />} />
+          <Route path="/tickets/:id" element={<TicketDetails />} />
+        </Route>
 
-        <Route path="/participant" element={<PrivateRoute roles={['EMPLOYEE', 'SUPER_ADMIN', 'ORGANIZER']}><MainLayout /></PrivateRoute>}>
+        <Route path="/participant" element={<PrivateRoute roles={['EMPLOYEE', 'PARTICIPANT', 'SUPER_ADMIN', 'ORGANIZER']}><MainLayout /></PrivateRoute>}>
           <Route index element={<Navigate to="/participant/dashboard" />} />
           <Route path="dashboard" element={<ParticipantDashboard />} />
           <Route path="bookings" element={<ParticipantBookings />} />
@@ -151,6 +155,7 @@ function RoleDashboard() {
     ORGANIZER: '/admin/dashboard',
     DRIVER: '/driver/dashboard',
     EMPLOYEE: '/participant/dashboard',
+    PARTICIPANT: '/participant/dashboard',
   };
   const target = roleRoutes[user.role];
   if (!target) {

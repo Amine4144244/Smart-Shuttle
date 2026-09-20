@@ -9,6 +9,7 @@ const roleHomePaths: Record<string, string> = {
   ORGANIZER: '/admin/dashboard',
   DRIVER: '/driver/dashboard',
   EMPLOYEE: '/participant/dashboard',
+  PARTICIPANT: '/participant/dashboard',
 };
 
 interface BackButtonProps {
