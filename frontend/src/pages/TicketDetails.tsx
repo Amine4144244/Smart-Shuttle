@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { QrCode, Bus, MapPin, Clock, Calendar, User, Phone, FileText, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { QrCode, Bus, MapPin, Clock, Calendar, User, Phone, FileText, ArrowLeft, ShieldCheck, CheckCircle2, Ticket } from 'lucide-react';
 import SafeQRCode from '@/components/shared/SafeQRCode';
 
 const getBadgeVariant = (status: string): 'default' | 'secondary' | 'outline' | 'live' | 'scheduled' | 'delayed' | 'completed' | 'cancelled' => {
@@ -84,14 +84,15 @@ export default function TicketDetails() {
   const t = ticket;
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto py-2">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" asChild className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
-          <Link to="/participant/tickets">
-            <ArrowLeft className="h-4 w-4" /> Back to My Passes
-          </Link>
-        </Button>
-        <span className="text-xs font-mono text-muted-foreground tracking-wider uppercase">
+    <div className="space-y-6 max-w-2xl mx-auto py-2 font-sans selection:bg-[#ffac00] selection:text-black">
+      <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-800 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase bg-[#ffac00]/15 text-[#ffac00] border border-[#ffac00]/30 shadow-sm">
+            <Ticket className="h-3 w-3" />
+            DIGITAL BOARDING PASS
+          </span>
+        </div>
+        <span className="text-xs font-mono font-bold text-neutral-500 dark:text-neutral-400 tracking-wider uppercase">
           E-Pass #{t.reservationCode}
         </span>
       </div>
