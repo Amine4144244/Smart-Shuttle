@@ -151,16 +151,15 @@ export default function ParticipantBookings() {
     bookMutation.mutate({
       eventId: selectedEvent,
       pickupPointId: selectedPickupPointId || undefined,
+      pickupLat: Number(pickupLat),
+      pickupLng: Number(pickupLng),
+      pickupAddress: pickupAddress || 'Custom GPS Pickup Location',
+      pickupTime,
       date: dateStr,
       time: timeStr,
-      passengerCount,
-      contactPhone,
-      pickupLatitude: pickupLat,
-      pickupLongitude: pickupLng,
-      pickupAddress,
-      pickupTime: new Date(pickupTime).toISOString(),
-      notes,
-      skipMatching: false,
+      passengerCount: Number(passengerCount),
+      contactPhone: contactPhone || undefined,
+      notes: notes || undefined,
     });
   };
 
@@ -171,26 +170,27 @@ export default function ParticipantBookings() {
   const resetForm = () => {
     setSelectedEvent(null);
     setSelectedPickupPointId(null);
+    setPassengerCount(1);
+    setContactPhone(user?.phone || '');
     setPickupLat(null);
     setPickupLng(null);
     setPickupAddress('');
     setPickupTime('');
-    setPassengerCount(1);
     setNotes('');
-    setShowMatches(false);
     setMatches([]);
+    setShowMatches(false);
   };
 
   const handleSelectEvent = (event: any) => {
-    if (bookedEventIds.has(event.id)) return;
-    setSelectedEvent(event.id);
-
-    // Set default pickup time if event has date & startTime
-    if (event.date) {
-      const dateOnly = event.date.split('T')[0];
-      const startOnly = event.startTime || '18:00';
-      setPickupTime(`${dateOnly}T${startOnly}`);
+    if (bookedEventIds.has(event.id)) {
+      toast.error('You already have an active booking for this event');
+      return;
     }
+    setSelectedEvent(event.id);
+    const eventDate = new Date(event.date);
+    const timePart = event.startTime || '09:00';
+    const combinedStr = `${eventDate.toISOString().split('T')[0]}T${timePart}`;
+    setPickupTime(combinedStr);
     setStep('select-pickup');
   };
 
@@ -220,29 +220,29 @@ export default function ParticipantBookings() {
   };
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
+    <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
       {/* 1. Header & Stepper */}
-      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-6">
+      <div className="border-b border-neutral-200/80 dark:border-neutral-800 pb-5 sm:pb-6">
         <div className="flex items-center gap-2 mb-1.5">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase bg-[#ffac00]/15 text-neutral-950 dark:text-[#ffac00] border border-[#ffac00]/30">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase bg-[#ffac00]/15 text-neutral-950 dark:text-[#ffac00] border border-[#ffac00]/30 shadow-xs">
             <Sparkles className="h-3 w-3" />
             INSTANT DISPATCH BOOKING
           </span>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-neutral-950 dark:text-white">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
           Book Shuttle Pass
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-          Select your destination event, pick your station, and receive instant digital QR credentials.
+          Select your destination event, choose your station, and get instant digital QR credentials.
         </p>
 
-        {/* Rivian Stepper Indicator */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-6">
+        {/* Responsive Stepper Indicator */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-3 mt-4 sm:mt-6">
           {[
-            { id: 'select-event', label: '1. Select Event', desc: 'Destination' },
-            { id: 'select-pickup', label: '2. Station & Time', desc: 'Pickup Details' },
-            { id: 'review-matches', label: '3. Digital Pass', desc: 'Confirmation' },
-          ].map((s, idx) => {
+            { id: 'select-event', stepNum: '1', label: 'Select Event', desc: 'Destination' },
+            { id: 'select-pickup', stepNum: '2', label: 'Station & Time', desc: 'Pickup Details' },
+            { id: 'review-matches', stepNum: '3', label: 'Digital Pass', desc: 'Confirmation' },
+          ].map((s) => {
             const isActive = step === s.id;
             const isPassed =
               (s.id === 'select-event' && step !== 'select-event') ||
@@ -251,21 +251,23 @@ export default function ParticipantBookings() {
             return (
               <div
                 key={s.id}
-                className={`p-3 rounded-2xl border transition-all ${
+                className={`p-2.5 sm:p-3 rounded-2xl border transition-all text-left ${
                   isActive
-                    ? 'border-[#ffac00] bg-[#ffac00]/10 text-neutral-950 dark:text-white'
+                    ? 'border-[#ffac00] bg-[#ffac00]/10 text-neutral-950 dark:text-white font-bold shadow-xs'
                     : isPassed
                     ? 'border-[#629b5c]/40 bg-[#629b5c]/10 text-neutral-900 dark:text-neutral-200'
                     : 'border-neutral-200 dark:border-neutral-800 bg-white/50 dark:bg-[#14161c]/50 text-neutral-400'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold tracking-tight">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[11px] sm:text-xs font-black truncate">
+                    <span className="sm:hidden">{s.stepNum}. </span>
+                    <span className="hidden sm:inline">{s.stepNum}. </span>
                     {s.label}
                   </span>
-                  {isPassed && <Check className="h-3.5 w-3.5 text-[#629b5c]" />}
+                  {isPassed && <Check className="h-3.5 w-3.5 text-[#629b5c] shrink-0" />}
                 </div>
-                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 hidden sm:block mt-0.5">
+                <p className="text-[10px] text-neutral-500 dark:text-neutral-400 hidden sm:block mt-0.5 truncate">
                   {s.desc}
                 </p>
               </div>
@@ -278,7 +280,7 @@ export default function ParticipantBookings() {
       {step === 'select-event' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-extrabold tracking-tight text-neutral-950 dark:text-white">
+            <h2 className="text-base sm:text-lg font-black tracking-tight text-neutral-950 dark:text-white">
               Choose an Event
             </h2>
             <span className="text-xs text-neutral-400 font-mono">
@@ -287,19 +289,19 @@ export default function ParticipantBookings() {
           </div>
 
           {isEventsLoading ? (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-36 rounded-3xl bg-neutral-200/60 dark:bg-neutral-800/60 animate-pulse" />
+                <div key={i} className="h-32 sm:h-36 rounded-3xl bg-neutral-200/60 dark:bg-neutral-800/60 animate-pulse" />
               ))}
             </div>
           ) : !events?.data || events.data.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-12 text-center bg-white dark:bg-[#14161c]">
-              <Calendar className="h-10 w-10 text-neutral-400 mx-auto mb-2 opacity-50" />
+            <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-8 sm:p-12 text-center bg-white dark:bg-[#14161c]">
+              <Calendar className="h-10 w-10 text-neutral-400 mx-auto mb-2 opacity-50 text-[#ffac00]" />
               <p className="text-base font-bold text-neutral-800 dark:text-neutral-200">No events currently scheduled</p>
               <p className="text-xs text-neutral-400 mt-1">Check back soon for upcoming shuttle schedules.</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
               {events.data
                 .filter((e: any) => e.status === 'PUBLISHED' || e.status === 'ONGOING')
                 .map((event: any) => {
@@ -312,30 +314,30 @@ export default function ParticipantBookings() {
                     <div
                       key={event.id}
                       onClick={() => handleSelectEvent(event)}
-                      className={`relative p-5 rounded-3xl border transition-all duration-200 bg-white dark:bg-[#14161c] ${
+                      className={`relative p-4 sm:p-5 rounded-3xl border transition-all duration-200 bg-white dark:bg-[#14161c] ${
                         alreadyBooked
                           ? 'opacity-60 cursor-not-allowed border-neutral-200 dark:border-neutral-800'
                           : 'cursor-pointer border-neutral-200/80 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 hover:shadow-lg'
                       }`}
                     >
-                      <div className="flex items-start gap-4">
+                      <div className="flex items-start gap-3 sm:gap-4">
                         {/* Date Chip */}
-                        <div className="flex flex-col items-center justify-center w-14 h-16 rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-950 dark:text-white shrink-0">
-                          <span className="text-[10px] font-extrabold text-[#ffac00]">{month}</span>
-                          <span className="text-lg font-extrabold leading-none">{day}</span>
+                        <div className="flex flex-col items-center justify-center w-12 h-14 sm:w-14 sm:h-16 rounded-2xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-950 dark:text-white shrink-0">
+                          <span className="text-[9px] sm:text-[10px] font-extrabold text-[#ffac00]">{month}</span>
+                          <span className="text-base sm:text-lg font-black leading-none">{day}</span>
                         </div>
 
-                        <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center justify-between gap-2">
-                            <h3 className="font-extrabold text-base text-neutral-950 dark:text-white truncate">
+                            <h3 className="font-extrabold text-sm sm:text-base text-neutral-950 dark:text-white truncate">
                               {event.name}
                             </h3>
                             {alreadyBooked ? (
-                              <span className="rounded-full bg-[#629b5c]/20 px-2.5 py-0.5 text-[10px] font-bold text-[#629b5c]">
+                              <span className="rounded-full bg-[#629b5c]/20 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-[#629b5c] shrink-0">
                                 Booked
                               </span>
                             ) : (
-                              <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2.5 py-0.5 text-[10px] font-bold text-neutral-600 dark:text-neutral-400">
+                              <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-neutral-600 dark:text-neutral-400 shrink-0">
                                 {event.capacity} seats
                               </span>
                             )}
@@ -345,11 +347,11 @@ export default function ParticipantBookings() {
                             {event.address && (
                               <div className="flex items-center gap-1.5 truncate">
                                 <MapPin className="h-3.5 w-3.5 text-[#ffac00] shrink-0" />
-                                <span className="truncate">{event.address}</span>
+                                <span className="truncate text-[11px] sm:text-xs">{event.address}</span>
                               </div>
                             )}
                             {event.startTime && (
-                              <div className="flex items-center gap-1.5 font-mono text-[11px]">
+                              <div className="flex items-center gap-1.5 font-mono text-[10px] sm:text-[11px]">
                                 <Clock className="h-3.5 w-3.5 text-[#629b5c] shrink-0" />
                                 <span>{event.startTime} {event.endTime ? `— ${event.endTime}` : ''}</span>
                               </div>
@@ -359,8 +361,8 @@ export default function ParticipantBookings() {
                       </div>
 
                       {!alreadyBooked && (
-                        <div className="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-300 font-bold">
-                          <span>Select Station & Pickup</span>
+                        <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between text-xs text-neutral-600 dark:text-neutral-300 font-bold">
+                          <span className="text-[11px] sm:text-xs">Select Station & Pickup</span>
                           <ChevronRight className="h-4 w-4 text-[#ffac00]" />
                         </div>
                       )}
@@ -374,50 +376,50 @@ export default function ParticipantBookings() {
 
       {/* 3. Step 2: Station & Pickup Preferences */}
       {step === 'select-pickup' && selectedEventObj && (
-        <div className="space-y-6 animate-in fade-in duration-200">
+        <div className="space-y-5 sm:space-y-6 animate-in fade-in duration-200">
           {/* Selected Event Context Bar */}
-          <div className="p-4 sm:p-5 rounded-3xl bg-neutral-950 text-white border border-neutral-800 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#ffac00] text-neutral-950 flex items-center justify-center font-extrabold">
-                <Bus className="h-5 w-5" />
+          <div className="p-3.5 sm:p-5 rounded-3xl bg-neutral-950 text-white border border-neutral-800 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#ffac00] text-neutral-950 flex items-center justify-center font-extrabold shrink-0">
+                <Bus className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
               </div>
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#ffac00]">
+              <div className="min-w-0">
+                <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-[#ffac00] block truncate">
                   Selected Event
                 </span>
-                <h3 className="font-extrabold text-base text-white">
+                <h3 className="font-extrabold text-sm sm:text-base text-white truncate">
                   {selectedEventObj.name}
                 </h3>
               </div>
             </div>
             <button
               onClick={() => setStep('select-event')}
-              className="text-xs font-bold text-neutral-400 hover:text-white underline underline-offset-4"
+              className="text-xs font-bold text-neutral-400 hover:text-white underline underline-offset-4 shrink-0"
             >
-              Change Event
+              Change
             </button>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-5 sm:gap-6 grid-cols-1 md:grid-cols-2">
             {/* Pickup Location Card */}
-            <div className="p-6 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-[#ffac00]/15 text-[#ffac00] flex items-center justify-center font-bold">
+            <div className="p-4 sm:p-6 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-[#ffac00]/15 text-[#ffac00] flex items-center justify-center font-bold shrink-0">
                     <MapPin className="h-4 w-4" />
                   </div>
-                  <div>
-                    <h3 className="font-extrabold text-sm text-neutral-950 dark:text-white">
+                  <div className="min-w-0">
+                    <h3 className="font-extrabold text-sm text-neutral-950 dark:text-white truncate">
                       Pickup Station
                     </h3>
-                    <p className="text-[11px] text-neutral-400">Choose an official stop or GPS</p>
+                    <p className="text-[10px] sm:text-[11px] text-neutral-400 truncate">Choose station or GPS</p>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={handleDetectLocation}
-                  className="rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-all"
+                  className="rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 transition-all shrink-0"
                 >
                   <Navigation className="h-3.5 w-3.5 text-[#629b5c]" />
                   Use GPS
@@ -426,7 +428,7 @@ export default function ParticipantBookings() {
 
               {/* Official Pickup Points List */}
               <div className="space-y-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
                   Designated Stations
                 </label>
                 {pickupPoints?.data && pickupPoints.data.length > 0 ? (
@@ -437,15 +439,15 @@ export default function ParticipantBookings() {
                         <div
                           key={p.id}
                           onClick={() => handleSelectPickupPoint(p)}
-                          className={`p-3 rounded-2xl border cursor-pointer transition-all ${
+                          className={`p-2.5 sm:p-3 rounded-2xl border cursor-pointer transition-all ${
                             isSelected
                               ? 'border-[#ffac00] bg-[#ffac00]/10 text-neutral-950 dark:text-white font-bold'
                               : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs">{p.name}</span>
-                            {isSelected && <Check className="h-3.5 w-3.5 text-[#ffac00]" />}
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-semibold truncate">{p.name}</span>
+                            {isSelected && <Check className="h-3.5 w-3.5 text-[#ffac00] shrink-0" />}
                           </div>
                           {p.address && (
                             <p className="text-[10px] text-neutral-400 truncate mt-0.5">
@@ -465,34 +467,34 @@ export default function ParticipantBookings() {
               <div className="space-y-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-neutral-500">Latitude</label>
+                    <label className="text-[9px] sm:text-[10px] font-bold uppercase text-neutral-500">Latitude</label>
                     <input
                       type="number"
                       step="any"
                       placeholder="33.5731"
                       value={pickupLat ?? ''}
                       onChange={(e) => setPickupLat(e.target.value ? parseFloat(e.target.value) : null)}
-                      className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                      className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-2.5 sm:px-3 py-2 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-neutral-500">Longitude</label>
+                    <label className="text-[9px] sm:text-[10px] font-bold uppercase text-neutral-500">Longitude</label>
                     <input
                       type="number"
                       step="any"
                       placeholder="-7.5898"
                       value={pickupLng ?? ''}
                       onChange={(e) => setPickupLng(e.target.value ? parseFloat(e.target.value) : null)}
-                      className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                      className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-2.5 sm:px-3 py-2 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-neutral-500">Station Name / Address</label>
+                  <label className="text-[9px] sm:text-[10px] font-bold uppercase text-neutral-500">Station Name / Address</label>
                   <input
                     type="text"
-                    placeholder="Terminal A Gate / Station 4"
+                    placeholder="e.g. Casa Port Station Gate 2"
                     value={pickupAddress}
                     onChange={(e) => setPickupAddress(e.target.value)}
                     className="w-full rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2 text-xs text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
@@ -502,46 +504,46 @@ export default function ParticipantBookings() {
             </div>
 
             {/* Trip Preferences Card */}
-            <div className="p-6 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-4 flex flex-col justify-between">
+            <div className="p-4 sm:p-6 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-4 flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                  <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold shrink-0">
                     <Clock className="h-4 w-4" />
                   </div>
                   <div>
                     <h3 className="font-extrabold text-sm text-neutral-950 dark:text-white">
                       Time & Passengers
                     </h3>
-                    <p className="text-[11px] text-neutral-400">Set schedule and group size</p>
+                    <p className="text-[10px] sm:text-[11px] text-neutral-400">Set schedule and group size</p>
                   </div>
                 </div>
 
                 {/* Passenger Stepper */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
                     Number of Seats
                   </label>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => setPassengerCount(Math.max(1, passengerCount - 1))}
                       disabled={passengerCount <= 1}
-                      className="w-9 h-9 rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 font-bold text-sm hover:bg-neutral-200 disabled:opacity-40"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 font-bold text-sm hover:bg-neutral-200 disabled:opacity-40"
                     >
                       -
                     </button>
-                    <span className="w-12 text-center text-lg font-extrabold font-mono text-neutral-950 dark:text-white">
+                    <span className="w-8 sm:w-10 text-center text-base sm:text-lg font-black font-mono text-neutral-950 dark:text-white">
                       {passengerCount}
                     </span>
                     <button
                       type="button"
                       onClick={() => setPassengerCount(Math.min(20, passengerCount + 1))}
                       disabled={passengerCount >= 20}
-                      className="w-9 h-9 rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 font-bold text-sm hover:bg-neutral-200 disabled:opacity-40"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 font-bold text-sm hover:bg-neutral-200 disabled:opacity-40"
                     >
                       +
                     </button>
-                    <span className="text-xs text-neutral-400 ml-2">
+                    <span className="text-xs text-neutral-400 ml-1 truncate">
                       {passengerCount > 1 ? 'Group reservation' : 'Single passenger'}
                     </span>
                   </div>
@@ -549,21 +551,21 @@ export default function ParticipantBookings() {
 
                 {/* Pickup DateTime */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
                     Pickup Schedule
                   </label>
                   <input
                     type="datetime-local"
                     value={pickupTime}
                     onChange={(e) => setPickupTime(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3.5 py-2.5 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                    className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2.5 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                   />
                 </div>
 
                 {/* Contact Phone */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
-                    Contact Phone (for Driver SMS updates)
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                    Contact Phone (Driver SMS updates)
                   </label>
                   <div className="relative">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
@@ -571,17 +573,17 @@ export default function ParticipantBookings() {
                     </div>
                     <input
                       type="tel"
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+212 600-000000"
                       value={contactPhone}
                       onChange={(e) => setContactPhone(e.target.value)}
-                      className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 pl-9 pr-3.5 py-2.5 text-xs text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                      className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 pl-9 pr-3 py-2.5 text-xs text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Special Notes */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
                     Special Notes (Optional)
                   </label>
                   <input
@@ -589,26 +591,26 @@ export default function ParticipantBookings() {
                     placeholder="Luggage, wheelchair, or group notes"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3.5 py-2.5 text-xs text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                    className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2.5 text-xs text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                   />
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
+              {/* Action Buttons (Stacked on mobile) */}
+              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-800">
                 <button
                   type="button"
                   onClick={() => setStep('select-event')}
-                  className="rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white font-bold py-3 px-6 text-xs transition-all flex items-center gap-1.5"
+                  className="rounded-full border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white font-bold py-2.5 sm:py-3 px-5 text-xs transition-all flex items-center justify-center gap-1.5 order-2 sm:order-1"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" /> Back
+                  <ArrowLeft className="h-3.5 w-3.5" /> Previous
                 </button>
 
                 <button
                   type="button"
                   onClick={handleBook}
                   disabled={bookMutation.isPending}
-                  className="flex-1 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 font-extrabold py-3 px-6 text-xs shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60"
+                  className="flex-1 rounded-full bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200 font-extrabold py-3 px-5 text-xs shadow-lg transition-all flex items-center justify-center gap-2 active:scale-[0.99] disabled:opacity-60 order-1 sm:order-2"
                 >
                   {bookMutation.isPending ? (
                     <span>Scheduling Shuttle...</span>
@@ -625,36 +627,36 @@ export default function ParticipantBookings() {
         </div>
       )}
 
-      {/* 4. Step 3: Shared Shuttle Matches Found (Rivian Match Overlay) */}
+      {/* 4. Step 3: Shared Shuttle Matches Found (Match Overlay) */}
       {showMatches && matches.length > 0 && (
-        <div className="p-6 rounded-3xl bg-white dark:bg-[#14161c] border-2 border-[#ffac00] shadow-2xl space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#ffac00] text-neutral-950 flex items-center justify-center font-extrabold">
-                <UserPlus className="h-5 w-5" />
+        <div className="p-4 sm:p-6 rounded-3xl bg-white dark:bg-[#14161c] border-2 border-[#ffac00] shadow-2xl space-y-4 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3 sm:pb-4">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#ffac00] text-neutral-950 flex items-center justify-center font-extrabold shrink-0">
+                <UserPlus className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
               </div>
               <div>
-                <h3 className="font-extrabold text-base text-neutral-950 dark:text-white">
+                <h3 className="font-extrabold text-sm sm:text-base text-neutral-950 dark:text-white">
                   Shared Shuttles Nearby!
                 </h3>
-                <p className="text-xs text-neutral-400">
-                  We found existing event shuttles passing near your pickup station. Join one for fast boarding!
+                <p className="text-[11px] sm:text-xs text-neutral-400">
+                  We found existing event shuttles near your pickup station. Join one for fast boarding!
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
             {matches.map((match: any, idx: number) => (
               <div
                 key={match.matchId}
-                className="p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 space-y-3"
+                className="p-3.5 sm:p-4 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 space-y-3"
               >
                 <div className="flex items-center justify-between">
                   <span className="rounded-full bg-[#ffac00]/20 px-2.5 py-0.5 text-[10px] font-bold text-[#ffac00]">
                     Match #{idx + 1}
                   </span>
-                  <span className="text-xs font-bold text-neutral-900 dark:text-white">
+                  <span className="text-xs font-bold text-neutral-900 dark:text-white truncate">
                     {match.existingParticipant?.firstName}'s Shuttle
                   </span>
                 </div>
@@ -692,7 +694,7 @@ export default function ParticipantBookings() {
               onClick={() => navigate('/participant/tickets')}
               className="text-xs text-neutral-400 hover:text-neutral-900 dark:hover:text-white font-bold underline underline-offset-4"
             >
-              Skip — Keep My Own Dedicated Shuttle Pass
+              Skip — Keep My Dedicated Pass
             </button>
           </div>
         </div>
@@ -700,9 +702,9 @@ export default function ParticipantBookings() {
 
       {/* Searching Banner */}
       {searching && (
-        <div className="p-6 rounded-3xl bg-neutral-950 text-white border border-neutral-800 flex items-center justify-center gap-3">
-          <div className="w-5 h-5 rounded-full border-2 border-[#ffac00] border-t-transparent animate-spin" />
-          <span className="text-sm font-bold text-neutral-200">{searching}</span>
+        <div className="p-4 sm:p-6 rounded-3xl bg-neutral-950 text-white border border-neutral-800 flex items-center justify-center gap-3">
+          <div className="w-5 h-5 rounded-full border-2 border-[#ffac00] border-t-transparent animate-spin shrink-0" />
+          <span className="text-xs sm:text-sm font-bold text-neutral-200 text-center">{searching}</span>
         </div>
       )}
     </div>

@@ -187,17 +187,17 @@ export default function ParticipantTrack() {
 
   if (isLoading || (isActiveTripsLoading && !tripId)) {
     return (
-      <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
+      <div className="flex h-[50vh] sm:h-[60vh] flex-col items-center justify-center gap-3 sm:gap-4 px-4 text-center">
         <div className="relative flex items-center justify-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-3 border-[#ffac00] border-t-transparent" />
-          <Radio className="absolute h-5 w-5 text-[#ffac00] animate-pulse" />
+          <div className="h-10 w-10 sm:h-12 sm:w-12 animate-spin rounded-full border-3 border-[#ffac00] border-t-transparent" />
+          <Radio className="absolute h-4 w-4 sm:h-5 sm:w-5 text-[#ffac00] animate-pulse" />
         </div>
-        <div className="text-center space-y-1">
+        <div className="space-y-1">
           <p className="text-xs font-mono font-bold uppercase tracking-widest text-[#ffac00]">
             Syncing Live Shuttle Radar
           </p>
-          <p className="text-xs text-neutral-400 font-sans">
-            Connecting to Moroccan GPS telemetry stream...
+          <p className="text-[11px] sm:text-xs text-neutral-400 font-sans">
+            Connecting to GPS telemetry stream...
           </p>
         </div>
       </div>
@@ -208,31 +208,31 @@ export default function ParticipantTrack() {
   if (!trip) {
     const activeList = Array.isArray(activeTrips) ? activeTrips : [];
     return (
-      <div className="space-y-6 max-w-5xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
+      <div className="space-y-5 sm:space-y-6 max-w-5xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
         {/* Top Header Card */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200/80 dark:border-neutral-800 pb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-neutral-200/80 dark:border-neutral-800 pb-4 sm:pb-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase bg-[#ffac00]/15 text-[#ffac00] border border-[#ffac00]/30 shadow-sm">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase bg-[#ffac00]/15 text-[#ffac00] border border-[#ffac00]/30 shadow-xs">
                 <Radio className="h-3 w-3 animate-pulse" />
                 LIVE RADAR RADIAL
               </span>
-              <span className="text-xs font-mono text-neutral-400">
+              <span className="text-[11px] sm:text-xs font-mono text-neutral-400">
                 {activeList.length} Active {activeList.length === 1 ? 'Shuttle' : 'Shuttles'}
               </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
               Select Active Shuttle Fleet
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-xl">
-              Select any live vehicle on the road to stream real-time GPS positioning, arrival estimates, and stop progression.
+              Select any live vehicle on the road to stream real-time GPS coordinates, arrival times, and stop progression.
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
               onClick={() => navigate('/participant/tickets')}
-              className="rounded-full bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-neutral-100 dark:text-neutral-900 font-bold px-4 py-2 text-xs shadow-sm transition-all flex items-center gap-1.5"
+              className="rounded-full bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-neutral-100 dark:text-neutral-900 font-bold px-4 py-2 text-xs shadow-xs transition-all flex items-center gap-1.5"
             >
               <Ticket className="h-3.5 w-3.5 text-[#ffac00]" />
               My Passes
@@ -242,9 +242,9 @@ export default function ParticipantTrack() {
 
         {/* Fleet Grid or Empty State */}
         {activeList.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-12 text-center bg-white dark:bg-[#14161c] space-y-4 shadow-sm">
-            <div className="w-16 h-16 rounded-3xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
-              <Bus className="h-8 w-8 opacity-60 text-[#ffac00]" />
+          <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-8 sm:p-12 text-center bg-white dark:bg-[#14161c] space-y-4 shadow-xs">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+              <Bus className="h-7 w-7 sm:h-8 sm:w-8 opacity-60 text-[#ffac00]" />
             </div>
             <div className="space-y-1 max-w-md mx-auto">
               <p className="text-base font-bold text-neutral-900 dark:text-white">
@@ -254,45 +254,45 @@ export default function ParticipantTrack() {
                 There are currently no active shuttle runs broadcasting telemetry. Once a driver begins a scheduled trip, live GPS radar will appear here automatically.
               </p>
             </div>
-            <div className="flex items-center justify-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3 pt-2">
               <button
                 onClick={() => navigate('/participant/tickets')}
-                className="rounded-full bg-[#ffac00] hover:bg-[#e59b00] text-neutral-950 font-extrabold px-6 py-2.5 text-xs shadow-md transition-all flex items-center gap-2"
+                className="w-full sm:w-auto rounded-full bg-[#ffac00] hover:bg-[#e59b00] text-neutral-950 font-black px-6 py-2.5 text-xs shadow-md transition-all flex items-center justify-center gap-2"
               >
                 <Ticket className="h-3.5 w-3.5 text-neutral-950" />
                 View My Boarding Passes
               </button>
               <button
                 onClick={() => navigate('/participant/bookings')}
-                className="rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 font-bold px-5 py-2.5 text-xs transition-all text-neutral-800 dark:text-neutral-200"
+                className="w-full sm:w-auto rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 font-bold px-5 py-2.5 text-xs transition-all text-neutral-800 dark:text-neutral-200"
               >
                 Book Shuttle Pass
               </button>
             </div>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
             {activeList.map((t: any) => (
               <div
                 key={t.id}
                 onClick={() => navigate(`/participant/track/${t.id}`)}
-                className="group relative p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 hover:border-[#ffac00] dark:hover:border-[#ffac00] shadow-sm hover:shadow-lg cursor-pointer transition-all duration-300 space-y-4"
+                className="group relative p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 hover:border-[#ffac00] dark:hover:border-[#ffac00] shadow-sm hover:shadow-lg cursor-pointer transition-all duration-300 space-y-3 sm:space-y-4"
               >
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-[#629b5c]/15 text-[#629b5c] border border-[#629b5c]/30">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-[#629b5c]/15 text-[#629b5c] border border-[#629b5c]/30 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#629b5c] animate-pulse" />
                     LIVE TELEMETRY
                   </span>
-                  <span className="text-xs font-mono font-bold text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2.5 py-1 rounded-full">
+                  <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2.5 py-0.5 rounded-full truncate">
                     {t.vehicle?.busNumber || 'Express Bus'}
                   </span>
                 </div>
 
-                <div className="space-y-1">
-                  <h3 className="font-black text-base text-neutral-950 dark:text-white group-hover:text-[#ffac00] transition-colors">
+                <div className="space-y-1 min-w-0">
+                  <h3 className="font-black text-sm sm:text-base text-neutral-950 dark:text-white group-hover:text-[#ffac00] transition-colors truncate">
                     {t.route?.name || 'Event Shuttle Transit'}
                   </h3>
-                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium">
+                  <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium truncate">
                     <MapPin className="h-3.5 w-3.5 text-[#629b5c] shrink-0" />
                     <span className="truncate">{t.route?.origin || 'Start'}</span>
                     <ChevronRight className="h-3 w-3 text-neutral-400 shrink-0" />
@@ -300,13 +300,13 @@ export default function ParticipantTrack() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-neutral-100 dark:border-neutral-800/80 text-xs">
-                  <div className="flex items-center gap-1.5 text-neutral-500">
-                    <Users className="h-3.5 w-3.5 text-neutral-400" />
-                    <span>Driver: <strong className="text-neutral-800 dark:text-neutral-200">{t.driver?.user?.firstName || 'Assigned'}</strong></span>
+                <div className="flex items-center justify-between pt-2.5 sm:pt-3 border-t border-neutral-100 dark:border-neutral-800/80 text-xs">
+                  <div className="flex items-center gap-1.5 text-neutral-500 truncate">
+                    <Users className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                    <span className="truncate text-[11px] sm:text-xs">Driver: <strong className="text-neutral-800 dark:text-neutral-200">{t.driver?.user?.firstName || 'Assigned'}</strong></span>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[#ffac00] font-extrabold group-hover:translate-x-0.5 transition-transform">
-                    Stream Radar <ChevronRight className="h-4 w-4" />
+                  <span className="inline-flex items-center gap-1 text-[#ffac00] font-black group-hover:translate-x-0.5 transition-transform text-xs shrink-0">
+                    Stream Radar <ChevronRight className="h-3.5 w-3.5" />
                   </span>
                 </div>
               </div>
@@ -319,28 +319,28 @@ export default function ParticipantTrack() {
 
   // Active Shuttle Live Cockpit View
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
       {/* 1. Cockpit Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200/80 dark:border-neutral-800 pb-5">
-        <div className="space-y-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-neutral-200/80 dark:border-neutral-800 pb-4 sm:pb-5">
+        <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold tracking-widest uppercase bg-[#629b5c]/15 text-[#629b5c] border border-[#629b5c]/30 shadow-sm">
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold tracking-widest uppercase bg-[#629b5c]/15 text-[#629b5c] border border-[#629b5c]/30 shadow-xs shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-[#629b5c] animate-pulse" />
               LIVE RADAR ACTIVE
             </span>
             {trip?.vehicle?.busNumber && (
-              <span className="text-xs font-mono font-bold text-neutral-500 dark:text-neutral-400">
+              <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-500 dark:text-neutral-400 truncate">
                 Shuttle #{trip.vehicle.busNumber}
               </span>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-neutral-950 dark:text-white truncate">
             {trip?.route?.name || 'Live Event Transit'}
           </h1>
-          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-neutral-500 dark:text-neutral-400">
-            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{trip?.route?.origin}</span>
-            <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
-            <span className="font-semibold text-neutral-800 dark:text-neutral-200">{trip?.route?.destination}</span>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 truncate">
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{trip?.route?.origin}</span>
+            <ChevronRight className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{trip?.route?.destination}</span>
           </div>
         </div>
 
@@ -349,37 +349,37 @@ export default function ParticipantTrack() {
           {userPos && (
             <button
               onClick={locateMe}
-              className="rounded-full h-10 px-4 text-xs font-bold border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 shadow-sm transition-all"
+              className="rounded-full h-9 sm:h-10 px-3.5 sm:px-4 text-xs font-bold border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 shadow-xs transition-all"
             >
-              <Locate className="h-3.5 w-3.5 text-blue-500" /> Center My GPS
+              <Locate className="h-3.5 w-3.5 text-blue-500" /> Center GPS
             </button>
           )}
 
-          <div className="rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 px-4 py-2 text-xs font-black flex items-center gap-2 shadow-sm border border-neutral-800 dark:border-neutral-200">
+          <div className="rounded-full bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-black flex items-center gap-2 shadow-xs border border-neutral-800 dark:border-neutral-200">
             <StatusIcon className="h-3.5 w-3.5 text-[#ffac00]" />
-            <span className="uppercase tracking-wider text-[11px]">{statusLabel || tripStatus.replace('_', ' ')}</span>
+            <span className="uppercase tracking-wider text-[10px] sm:text-[11px]">{statusLabel || tripStatus.replace('_', ' ')}</span>
           </div>
         </div>
       </div>
 
       {/* 2. Proximity Radar Notification */}
       {lastNotif && (
-        <div className="p-4 rounded-3xl bg-[#ffac00] text-neutral-950 border border-[#e59b00] shadow-lg flex items-center gap-3.5 animate-in slide-in-from-top-2">
-          <div className="w-9 h-9 rounded-2xl bg-black/10 flex items-center justify-center shrink-0">
-            <Radio className="h-5 w-5 animate-ping" />
+        <div className="p-3.5 sm:p-4 rounded-3xl bg-[#ffac00] text-neutral-950 border border-[#e59b00] shadow-lg flex items-center gap-3 animate-in slide-in-from-top-2">
+          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-black/10 flex items-center justify-center shrink-0">
+            <Radio className="h-4 w-4 sm:h-5 sm:w-5 animate-ping" />
           </div>
-          <div className="flex-1">
-            <span className="text-[10px] font-black uppercase tracking-widest block opacity-75">
+          <div className="flex-1 min-w-0">
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest block opacity-75">
               PROXIMITY RADAR ALERT
             </span>
-            <p className="text-sm font-extrabold">{lastNotif}</p>
+            <p className="text-xs sm:text-sm font-black truncate">{lastNotif}</p>
           </div>
         </div>
       )}
 
-      {/* 3. Rivian Trip Status Milestone Stepper */}
-      <div className="p-3 sm:p-4 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 shadow-sm overflow-x-auto">
-        <div className="flex items-center justify-between min-w-[680px] gap-2">
+      {/* 3. Milestone Stepper (Touch scrollable) */}
+      <div className="p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 shadow-xs overflow-x-auto no-scrollbar">
+        <div className="flex items-center justify-between min-w-[620px] sm:min-w-[680px] gap-1.5 sm:gap-2">
           {STATUS_SEQUENCE.map((step, idx) => {
             const currentIdx = STATUS_SEQUENCE.findIndex((s) => s.status === tripStatus);
             const isCompleted = idx < currentIdx;
@@ -387,9 +387,9 @@ export default function ParticipantTrack() {
             const StepIcon = step.icon;
 
             return (
-              <div key={step.status} className="flex items-center gap-2 shrink-0">
+              <div key={step.status} className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <div
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-xs transition-all ${
                     isCurrent
                       ? 'bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 font-black shadow-md border border-[#ffac00]/50'
                       : isCompleted
@@ -398,15 +398,15 @@ export default function ParticipantTrack() {
                   }`}
                 >
                   {isCompleted ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-[#629b5c]" />
+                    <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#629b5c]" />
                   ) : (
-                    <StepIcon className={`h-3.5 w-3.5 ${isCurrent ? 'text-[#ffac00]' : 'text-neutral-400'}`} />
+                    <StepIcon className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${isCurrent ? 'text-[#ffac00]' : 'text-neutral-400'}`} />
                   )}
-                  <span className="text-[11px] whitespace-nowrap">{step.label}</span>
+                  <span className="text-[10px] sm:text-[11px] whitespace-nowrap">{step.label}</span>
                 </div>
                 {idx < STATUS_SEQUENCE.length - 1 && (
                   <ChevronRight
-                    className={`h-3.5 w-3.5 ${
+                    className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${
                       isCompleted || isCurrent ? 'text-[#ffac00]' : 'text-neutral-300 dark:text-neutral-800'
                     }`}
                   />
@@ -418,22 +418,22 @@ export default function ParticipantTrack() {
       </div>
 
       {/* 4. Live Telemetry Cockpit Grid */}
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-12">
         {/* Left: Map Container with Floating HUD Overlays */}
         <div className="lg:col-span-8 rounded-3xl overflow-hidden border border-neutral-200/90 dark:border-neutral-800 bg-white dark:bg-[#14161c] shadow-md relative group">
           {/* Floating Map HUD (Top Left) */}
-          <div className="absolute top-4 left-4 z-[400] bg-white/90 dark:bg-neutral-950/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-lg pointer-events-none flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-[#629b5c] animate-pulse" />
-            <span className="text-[11px] font-mono font-bold text-neutral-800 dark:text-neutral-200">
-              Live Shuttle Tracking
+          <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-[400] bg-white/95 dark:bg-neutral-950/95 backdrop-blur-md px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl sm:rounded-2xl border border-neutral-200/80 dark:border-neutral-800 shadow-md pointer-events-none flex items-center gap-1.5 sm:gap-2">
+            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#629b5c] animate-pulse" />
+            <span className="text-[10px] sm:text-[11px] font-mono font-bold text-neutral-800 dark:text-neutral-200">
+              Live Shuttle Radar
             </span>
           </div>
 
           {/* Floating Speed Overlay (Top Right) */}
           {speed > 0 && (
-            <div className="absolute top-4 right-4 z-[400] bg-neutral-950/90 text-white backdrop-blur-md px-3.5 py-2 rounded-2xl border border-neutral-800 shadow-lg pointer-events-none flex items-center gap-1.5">
-              <Gauge className="h-3.5 w-3.5 text-[#ffac00]" />
-              <span className="text-xs font-mono font-black">{Math.round(speed)} km/h</span>
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[400] bg-neutral-950/95 text-white backdrop-blur-md px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl sm:rounded-2xl border border-neutral-800 shadow-md pointer-events-none flex items-center gap-1.5">
+              <Gauge className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#ffac00]" />
+              <span className="text-[10px] sm:text-xs font-mono font-black">{Math.round(speed)} km/h</span>
             </div>
           )}
 
@@ -444,7 +444,7 @@ export default function ParticipantTrack() {
             destination={destPoint}
             stops={stopPoints}
             routePath={routePoints}
-            height="560px"
+            height="380px"
             zoom={13}
           />
         </div>
@@ -452,7 +452,7 @@ export default function ParticipantTrack() {
         {/* Right: Telemetry Readouts & Route Timeline */}
         <div className="lg:col-span-4 space-y-4">
           {/* Telemetry Numbers Bento */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-4 shadow-sm">
+          <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-3.5 sm:space-y-4 shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase tracking-widest text-[#ffac00] flex items-center gap-1.5">
                 <Compass className="h-3 w-3" />
@@ -462,29 +462,29 @@ export default function ParticipantTrack() {
             </div>
 
             {/* Speed & ETA Gauge Duo */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 p-3.5 text-center">
-                <Gauge className="mx-auto mb-1 h-4 w-4 text-[#ffac00]" />
-                <p className="text-2xl font-black font-mono text-neutral-950 dark:text-white">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 p-2.5 sm:p-3.5 text-center">
+                <Gauge className="mx-auto mb-1 h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#ffac00]" />
+                <p className="text-xl sm:text-2xl font-black font-mono text-neutral-950 dark:text-white">
                   {speed ? `${Math.round(speed)}` : '0'}
                 </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">km/h Speed</p>
+                <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-neutral-400">km/h Speed</p>
               </div>
 
-              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 p-3.5 text-center">
-                <Timer className="mx-auto mb-1 h-4 w-4 text-[#629b5c]" />
-                <p className="text-2xl font-black font-mono text-[#ffac00]">
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 p-2.5 sm:p-3.5 text-center">
+                <Timer className="mx-auto mb-1 h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#629b5c]" />
+                <p className="text-xl sm:text-2xl font-black font-mono text-[#ffac00] truncate">
                   {eta || '--:--'}
                 </p>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Estimated Arrival</p>
+                <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-neutral-400">Estimated ETA</p>
               </div>
             </div>
 
             {/* Distance Remaining */}
             {distance !== null && (
               <div className="flex items-center justify-between text-xs pt-1 border-t border-neutral-100 dark:border-neutral-800/80">
-                <span className="text-neutral-500 font-medium">Remaining Distance</span>
-                <span className="font-mono font-black text-neutral-950 dark:text-white">
+                <span className="text-neutral-500 font-medium text-[11px] sm:text-xs">Remaining Distance</span>
+                <span className="font-mono font-black text-neutral-950 dark:text-white text-[11px] sm:text-xs">
                   {distance.toFixed(1)} km
                 </span>
               </div>
@@ -493,12 +493,12 @@ export default function ParticipantTrack() {
             {/* Progress Bar */}
             <div className="space-y-1.5 pt-1">
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500 font-medium">Route Progress</span>
-                <span className="font-mono font-black text-neutral-950 dark:text-white">
+                <span className="text-neutral-500 font-medium text-[11px] sm:text-xs">Route Progress</span>
+                <span className="font-mono font-black text-neutral-950 dark:text-white text-[11px] sm:text-xs">
                   {progress}%
                 </span>
               </div>
-              <div className="h-2.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
+              <div className="h-2 sm:h-2.5 overflow-hidden rounded-full bg-neutral-100 dark:bg-neutral-800">
                 <div
                   className="h-full rounded-full bg-[#ffac00] transition-all duration-700 ease-out"
                   style={{ width: `${Math.min(100, Math.max(5, progress))}%` }}
@@ -508,18 +508,18 @@ export default function ParticipantTrack() {
           </div>
 
           {/* Vehicle & Driver Details */}
-          <div className="p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-3.5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-[#ffac00]/20 text-[#ffac00] flex items-center justify-center font-bold">
-                  <Bus className="h-4.5 w-4.5" />
+          <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-3 sm:space-y-3.5 shadow-xs">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-[#ffac00]/20 text-[#ffac00] flex items-center justify-center font-bold shrink-0">
+                  <Bus className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
                 </div>
-                <div>
-                  <h3 className="font-black text-sm text-neutral-950 dark:text-white">
+                <div className="min-w-0">
+                  <h3 className="font-black text-xs sm:text-sm text-neutral-950 dark:text-white truncate">
                     Bus #{trip?.vehicle?.busNumber || 'Fleet Vehicle'}
                   </h3>
                   {trip?.vehicle?.plateNumber && (
-                    <p className="text-[11px] font-mono text-neutral-400">
+                    <p className="text-[10px] sm:text-[11px] font-mono text-neutral-400 truncate">
                       Plate: {trip.vehicle.plateNumber}
                     </p>
                   )}
@@ -527,7 +527,7 @@ export default function ParticipantTrack() {
               </div>
 
               {trip?.vehicle?.capacity && (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 text-neutral-500 font-bold">
+                <span className="text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 text-neutral-500 font-bold shrink-0">
                   {trip.vehicle.capacity} Seats
                 </span>
               )}
@@ -535,14 +535,14 @@ export default function ParticipantTrack() {
 
             <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 text-xs">
               {trip?.driver?.user && (
-                <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Driver</span>
-                  <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-white">
-                    <span>{trip.driver.user.firstName} {trip.driver.user.lastName}</span>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-neutral-500 font-medium text-[11px] sm:text-xs shrink-0">Driver</span>
+                  <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-white min-w-0">
+                    <span className="truncate text-[11px] sm:text-xs">{trip.driver.user.firstName} {trip.driver.user.lastName}</span>
                     {trip.driver.phone && (
                       <a
                         href={`tel:${trip.driver.phone}`}
-                        className="p-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-[#ffac00]"
+                        className="p-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-[#ffac00] shrink-0"
                         title="Call Driver"
                       >
                         <Phone className="h-3 w-3" />
@@ -553,16 +553,16 @@ export default function ParticipantTrack() {
               )}
               {trip?.departureTime && (
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Scheduled Departure</span>
-                  <span className="font-mono font-bold text-neutral-900 dark:text-white">
+                  <span className="text-neutral-500 font-medium text-[11px] sm:text-xs">Scheduled Departure</span>
+                  <span className="font-mono font-bold text-neutral-900 dark:text-white text-[11px] sm:text-xs">
                     {formatTime(trip.departureTime)}
                   </span>
                 </div>
               )}
               {trip?.reservations && (
                 <div className="flex items-center justify-between">
-                  <span className="text-neutral-500 font-medium">Confirmed Passengers</span>
-                  <span className="font-mono font-bold text-[#629b5c]">
+                  <span className="text-neutral-500 font-medium text-[11px] sm:text-xs">Passengers</span>
+                  <span className="font-mono font-bold text-[#629b5c] text-[11px] sm:text-xs">
                     {trip.reservations.length} Onboard
                   </span>
                 </div>
@@ -572,18 +572,18 @@ export default function ParticipantTrack() {
 
           {/* Route Station Stops Timeline */}
           {trip?.route?.stops && trip.route.stops.length > 0 && (
-            <div className="p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-3.5 shadow-sm">
+            <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-3 shadow-xs">
               <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 block">
                 STATION STOPS & TIMELINE
               </span>
-              <div className="space-y-3 text-xs relative pl-2">
+              <div className="space-y-2.5 text-xs relative pl-1 sm:pl-2">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-3 w-3 rounded-full bg-[#629b5c] ring-4 ring-[#629b5c]/20 shrink-0" />
+                  <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-[#629b5c] ring-4 ring-[#629b5c]/20 shrink-0" />
                   <div className="truncate">
-                    <p className="font-bold text-neutral-900 dark:text-white truncate">
+                    <p className="font-bold text-neutral-950 dark:text-white truncate text-[11px] sm:text-xs">
                       {trip.route.origin}
                     </p>
-                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-mono">Origin Departure</span>
+                    <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider font-mono">Origin Departure</span>
                   </div>
                 </div>
 
@@ -591,19 +591,19 @@ export default function ParticipantTrack() {
                   <div key={stop.id || sIdx} className="flex items-center gap-2.5 pl-0.5">
                     <div className="h-2 w-2 rounded-full border-2 border-neutral-400 shrink-0" />
                     <div className="truncate">
-                      <p className="text-neutral-700 dark:text-neutral-300 truncate font-medium">{stop.name}</p>
-                      <span className="text-[10px] text-neutral-400 font-mono">Stop #{sIdx + 1}</span>
+                      <p className="text-neutral-700 dark:text-neutral-300 truncate font-medium text-[11px] sm:text-xs">{stop.name}</p>
+                      <span className="text-[9px] sm:text-[10px] text-neutral-400 font-mono">Stop #{sIdx + 1}</span>
                     </div>
                   </div>
                 ))}
 
                 <div className="flex items-center gap-2.5">
-                  <div className="h-3 w-3 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
+                  <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
                   <div className="truncate">
-                    <p className="font-bold text-neutral-900 dark:text-white truncate">
+                    <p className="font-bold text-neutral-950 dark:text-white truncate text-[11px] sm:text-xs">
                       {trip.route.destination}
                     </p>
-                    <span className="text-[10px] text-neutral-400 uppercase tracking-wider font-mono">Event Destination</span>
+                    <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider font-mono">Event Destination</span>
                   </div>
                 </div>
               </div>
@@ -611,9 +611,9 @@ export default function ParticipantTrack() {
           )}
 
           {/* Security & Reliability Footer Note */}
-          <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-neutral-400 dark:text-neutral-500">
-            <ShieldCheck className="h-3.5 w-3.5 text-[#629b5c]" />
-            <span>Encrypted Moroccan GPS Telemetry • Updates every 2s</span>
+          <div className="flex items-center gap-2 px-2 py-1 text-[10px] sm:text-[11px] text-neutral-400 dark:text-neutral-500">
+            <ShieldCheck className="h-3.5 w-3.5 text-[#629b5c] shrink-0" />
+            <span className="truncate">Encrypted GPS Telemetry • Updates every 2s</span>
           </div>
         </div>
       </div>
