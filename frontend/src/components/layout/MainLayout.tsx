@@ -32,6 +32,7 @@ import {
 const roleMenuItems: Record<string, { label: string; path: string; icon: any }[]> = {
   SUPER_ADMIN: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Full Phase Setup', path: '/admin/full-phase', icon: Sparkles },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Events', path: '/admin/events', icon: Calendar },
     { label: 'Drivers', path: '/admin/drivers', icon: UserCircle },
@@ -45,6 +46,7 @@ const roleMenuItems: Record<string, { label: string; path: string; icon: any }[]
   ],
   ORGANIZER: [
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Full Phase Setup', path: '/admin/full-phase', icon: Sparkles },
     { label: 'Users', path: '/admin/users', icon: Users },
     { label: 'Events', path: '/admin/events', icon: Calendar },
     { label: 'Drivers', path: '/admin/drivers', icon: UserCircle },

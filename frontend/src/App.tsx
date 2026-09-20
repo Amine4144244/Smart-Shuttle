@@ -27,6 +27,7 @@ import AdminTrips from '@/pages/admin/Trips';
 import AdminReports from '@/pages/admin/Reports';
 import AdminActiveShuttles from '@/pages/admin/ActiveShuttles';
 import AdminReplayTrip from '@/pages/admin/ReplayTrip';
+import AdminFullPhaseConfig from '@/pages/admin/FullPhaseConfig';
 
 import DriverDashboard from '@/pages/driver/Dashboard';
 import DriverTrips from '@/pages/driver/Trips';
@@ -109,6 +110,8 @@ export default function App() {
           <Route path="trips/replay/:tripId" element={<AdminReplayTrip />} />
           <Route path="reports" element={<AdminReports />} />
           <Route path="active-shuttles" element={<AdminActiveShuttles />} />
+          <Route path="full-phase" element={<AdminFullPhaseConfig />} />
+          <Route path="setup-wizard" element={<AdminFullPhaseConfig />} />
         </Route>
 
         <Route path="/driver" element={<PrivateRoute roles={['DRIVER']}><MainLayout /></PrivateRoute>}>
