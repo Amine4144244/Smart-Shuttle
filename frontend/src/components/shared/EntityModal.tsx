@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
 interface EntityModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -17,6 +19,14 @@ interface EntityModalProps {
 }
 
 export function EntityModal({ open, onOpenChange, title, description, children, form, onSubmit, isSubmitting, submitLabel = 'Save' }: EntityModalProps) {
+  const onInvalid = (errors: any) => {
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length > 0) {
+      const firstError = errors[errorKeys[0]];
+      toast.error(firstError?.message || `Please check the ${errorKeys[0]} field`);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -24,7 +34,7 @@ export function EntityModal({ open, onOpenChange, title, description, children, 
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
           {children}
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

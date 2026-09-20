@@ -88,11 +88,20 @@ export const routeSchema = z.object({
 });
 
 export const pickupPointSchema = z.object({
-  name: z.string().min(2, 'Name is required'),
-  latitude: z.coerce.number().min(-90, 'Invalid latitude').max(90, 'Invalid latitude'),
-  longitude: z.coerce.number().min(-180, 'Invalid longitude').max(180, 'Invalid longitude'),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  latitude: z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? 0 : Number(v)),
+    z.number().min(-90, 'Invalid latitude').max(90, 'Invalid latitude').default(0)
+  ),
+  longitude: z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? 0 : Number(v)),
+    z.number().min(-180, 'Invalid longitude').max(180, 'Invalid longitude').default(0)
+  ),
   address: z.string().max(200).optional().or(z.literal('')),
-  maxCapacity: z.coerce.number().int().min(1, 'Capacity must be at least 1'),
+  maxCapacity: z.preprocess(
+    (v) => (v === '' || v === undefined || v === null ? 50 : Number(v)),
+    z.number().int().min(1, 'Capacity must be at least 1').default(50)
+  ),
   eventId: z.string().min(1, 'Event is required'),
 });
 

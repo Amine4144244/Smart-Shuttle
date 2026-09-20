@@ -17,7 +17,13 @@ router.get('/', async (req, res, next) => {
     if (search) where.name = { contains: search, mode: 'insensitive' };
 
     const [data, total] = await Promise.all([
-      prisma.pickupPoint.findMany({ where, orderBy: { name: 'asc' }, skip: (page - 1) * limit, take: limit }),
+      prisma.pickupPoint.findMany({
+        where,
+        include: { event: { select: { id: true, name: true } }, _count: { select: { reservations: true } } },
+        orderBy: { name: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
       prisma.pickupPoint.count({ where }),
     ]);
 
@@ -33,21 +39,47 @@ router.get('/:id', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-router.post('/', authorize('SUPER_ADMIN'), async (req, res, next) => {
+router.post('/', authorize('SUPER_ADMIN', 'ORGANIZER'), async (req, res, next) => {
   try {
-    const point = await prisma.pickupPoint.create({ data: req.body });
+    const { name, latitude, longitude, address, maxCapacity, eventId } = req.body;
+    if (!name || !eventId) {
+      throw new AppError('Name and Event are required', 400);
+    }
+    const lat = latitude !== undefined && latitude !== null && !isNaN(Number(latitude)) ? Number(latitude) : 0;
+    const lng = longitude !== undefined && longitude !== null && !isNaN(Number(longitude)) ? Number(longitude) : 0;
+    const capacity = maxCapacity ? parseInt(String(maxCapacity), 10) : 50;
+
+    const point = await prisma.pickupPoint.create({
+      data: {
+        name,
+        latitude: lat,
+        longitude: lng,
+        address: address || null,
+        maxCapacity: capacity || 50,
+        eventId,
+      },
+    });
     res.status(201).json(point);
   } catch (error) { next(error); }
 });
 
-router.put('/:id', authorize('SUPER_ADMIN'), async (req, res, next) => {
+router.put('/:id', authorize('SUPER_ADMIN', 'ORGANIZER'), async (req, res, next) => {
   try {
-    const point = await prisma.pickupPoint.update({ where: { id: req.params.id }, data: req.body });
+    const { name, latitude, longitude, address, maxCapacity, eventId } = req.body;
+    const data: any = {};
+    if (name !== undefined) data.name = name;
+    if (latitude !== undefined && latitude !== null && !isNaN(Number(latitude))) data.latitude = Number(latitude);
+    if (longitude !== undefined && longitude !== null && !isNaN(Number(longitude))) data.longitude = Number(longitude);
+    if (address !== undefined) data.address = address || null;
+    if (maxCapacity !== undefined) data.maxCapacity = parseInt(String(maxCapacity), 10) || 50;
+    if (eventId !== undefined) data.eventId = eventId;
+
+    const point = await prisma.pickupPoint.update({ where: { id: req.params.id }, data });
     res.json(point);
   } catch (error) { next(error); }
 });
 
-router.delete('/:id', authorize('SUPER_ADMIN'), async (req, res, next) => {
+router.delete('/:id', authorize('SUPER_ADMIN', 'ORGANIZER'), async (req, res, next) => {
   try {
     await prisma.pickupPoint.delete({ where: { id: req.params.id } });
     res.json({ message: 'Pickup point deleted' });

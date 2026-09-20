@@ -7,10 +7,10 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/available', vehicleController.getAvailable);
-router.get('/', authorize('SUPER_ADMIN'), vehicleController.findAll);
+router.get('/', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.findAll);
 router.get('/:id', vehicleController.findById);
-router.post('/', authorize('SUPER_ADMIN'), vehicleController.create);
-router.put('/:id', authorize('SUPER_ADMIN'), vehicleController.update);
-router.delete('/:id', authorize('SUPER_ADMIN'), vehicleController.delete);
+router.post('/', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.create);
+router.put('/:id', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.update);
+router.delete('/:id', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.delete);
 
 export default router;

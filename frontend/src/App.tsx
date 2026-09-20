@@ -121,11 +121,12 @@ export default function App() {
         <Route path="/driver/scan-qr" element={<PrivateRoute roles={['DRIVER']}><DriverScanQr /></PrivateRoute>} />
         <Route path="/ticket/:id" element={<PrivateRoute><MainLayout /><TicketDetails /></PrivateRoute>} />
 
-        <Route path="/participant" element={<PrivateRoute roles={['EMPLOYEE']}><MainLayout /></PrivateRoute>}>
+        <Route path="/participant" element={<PrivateRoute roles={['EMPLOYEE', 'SUPER_ADMIN', 'ORGANIZER']}><MainLayout /></PrivateRoute>}>
           <Route index element={<Navigate to="/participant/dashboard" />} />
           <Route path="dashboard" element={<ParticipantDashboard />} />
           <Route path="bookings" element={<ParticipantBookings />} />
           <Route path="tickets" element={<ParticipantMyTickets />} />
+          <Route path="track" element={<ParticipantTrack />} />
           <Route path="track/:tripId" element={<ParticipantTrack />} />
         </Route>
 
