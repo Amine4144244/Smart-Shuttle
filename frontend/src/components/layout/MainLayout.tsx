@@ -43,6 +43,19 @@ const roleMenuItems: Record<string, { label: string; path: string; icon: any }[]
     { label: 'Reports', path: '/admin/reports', icon: BarChart3 },
     { label: 'Active Shuttles', path: '/admin/active-shuttles', icon: Radio },
   ],
+  ORGANIZER: [
+    { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+    { label: 'Users', path: '/admin/users', icon: Users },
+    { label: 'Events', path: '/admin/events', icon: Calendar },
+    { label: 'Drivers', path: '/admin/drivers', icon: UserCircle },
+    { label: 'Vehicles', path: '/admin/vehicles', icon: Truck },
+    { label: 'Routes', path: '/admin/routes', icon: Route },
+    { label: 'Pickup Points', path: '/admin/pickup-points', icon: MapPin },
+    { label: 'Reservations', path: '/admin/reservations', icon: Ticket },
+    { label: 'Trips', path: '/admin/trips', icon: Bus },
+    { label: 'Reports', path: '/admin/reports', icon: BarChart3 },
+    { label: 'Active Shuttles', path: '/admin/active-shuttles', icon: Radio },
+  ],
   DRIVER: [
     { label: 'Dashboard', path: '/driver/dashboard', icon: LayoutDashboard },
     { label: 'My Trips', path: '/driver/trips', icon: Bus },
@@ -52,6 +65,13 @@ const roleMenuItems: Record<string, { label: string; path: string; icon: any }[]
     { label: 'Dashboard', path: '/participant/dashboard', icon: LayoutDashboard },
     { label: 'Book Shuttle', path: '/participant/bookings', icon: Calendar },
     { label: 'My Boarding Passes', path: '/participant/tickets', icon: Ticket },
+    { label: 'Live Shuttle Radar', path: '/participant/track', icon: Radio },
+  ],
+  PARTICIPANT: [
+    { label: 'Dashboard', path: '/participant/dashboard', icon: LayoutDashboard },
+    { label: 'Book Shuttle', path: '/participant/bookings', icon: Calendar },
+    { label: 'My Boarding Passes', path: '/participant/tickets', icon: Ticket },
+    { label: 'Live Shuttle Radar', path: '/participant/track', icon: Radio },
   ],
 };
 
@@ -66,13 +86,14 @@ export default function MainLayout() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const isParticipant = user?.role === 'EMPLOYEE';
+  const isParticipant = user?.role === 'EMPLOYEE' || user?.role === 'PARTICIPANT';
 
   const roleHomePaths: Record<string, string> = {
     SUPER_ADMIN: '/admin/dashboard',
     ORGANIZER: '/admin/dashboard',
     DRIVER: '/driver/dashboard',
     EMPLOYEE: '/participant/dashboard',
+    PARTICIPANT: '/participant/dashboard',
   };
   const isHomePage = location.pathname === roleHomePaths[user?.role || ''];
 

@@ -274,18 +274,25 @@ export default function ParticipantDashboard() {
                 </button>
               )}
 
-              {nextReservation.trip?.id && (
+              {nextReservation.trip?.id ? (
                 <button
                   className="w-full rounded-full border border-neutral-700 bg-neutral-900/90 hover:bg-neutral-800 text-white font-bold py-3 px-4 text-xs shadow flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
                   onClick={() => navigate(`/participant/track/${nextReservation.trip.id}`)}
                 >
                   <Navigation className="h-3.5 w-3.5 text-[#629b5c] animate-pulse" /> Track Live Shuttle
                 </button>
+              ) : (
+                <button
+                  className="w-full rounded-full border border-neutral-700 bg-neutral-900/90 hover:bg-neutral-800 text-white font-bold py-3 px-4 text-xs shadow flex items-center justify-center gap-2 transition-all active:scale-[0.99]"
+                  onClick={() => navigate('/participant/track')}
+                >
+                  <Radio className="h-3.5 w-3.5 text-[#ffac00]" /> Live Shuttle Radar
+                </button>
               )}
 
               <button
                 className="w-full rounded-full border border-transparent hover:border-neutral-800 text-neutral-400 hover:text-white text-xs py-2 flex items-center justify-center gap-1 transition-colors"
-                onClick={() => navigate(`/tickets/${nextReservation.id}`)}
+                onClick={() => navigate(`/ticket/${nextReservation.id}`)}
               >
                 Pass Details & Station Map <ChevronRight className="h-3.5 w-3.5" />
               </button>

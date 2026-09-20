@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   ChevronRight,
   ExternalLink,
+  Radio,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -322,14 +323,24 @@ export default function MyTickets() {
                           </div>
                         </div>
 
-                        {hasActiveTrip && !isCancelled && (
-                          <button
-                            onClick={() => navigate(`/participant/track/${r.trip.id}`)}
-                            className="rounded-full bg-[#629b5c]/15 hover:bg-[#629b5c]/25 text-[#629b5c] px-3 py-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all shrink-0"
-                          >
-                            <Navigation className="h-3 w-3 animate-pulse" />
-                            Live GPS Map
-                          </button>
+                        {!isCancelled && (
+                          hasActiveTrip ? (
+                            <button
+                              onClick={() => navigate(`/participant/track/${r.trip.id}`)}
+                              className="rounded-full bg-[#629b5c]/15 hover:bg-[#629b5c]/25 text-[#629b5c] px-3 py-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all shrink-0"
+                            >
+                              <Navigation className="h-3 w-3 animate-pulse" />
+                              Live GPS Map
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => navigate('/participant/track')}
+                              className="rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 px-3 py-1.5 text-[11px] font-bold flex items-center gap-1.5 transition-all shrink-0"
+                            >
+                              <Radio className="h-3 w-3 text-[#ffac00]" />
+                              Shuttle Radar
+                            </button>
+                          )
                         )}
                       </div>
                     )}
