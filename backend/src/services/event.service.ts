@@ -67,9 +67,27 @@ export class EventService {
   }
 
   async delete(id: string) {
-    await prisma.event.delete({ where: { id } }).catch(() => {
-      throw new AppError('Event not found', 404);
-    });
+    const event = await prisma.event.findUnique({ where: { id } });
+    if (!event) throw new AppError('Event not found', 404);
+
+    const routes = await prisma.route.findMany({ where: { eventId: id }, select: { id: true } });
+    const routeIds = routes.map((r) => r.id);
+
+    const trips = await prisma.trip.findMany({ where: { routeId: { in: routeIds } }, select: { id: true } });
+    const tripIds = trips.map((t) => t.id);
+
+    await prisma.$transaction([
+      prisma.trackingLog.deleteMany({ where: { tripId: { in: tripIds } } }),
+      prisma.reservationStatusHistory.deleteMany({ where: { reservation: { eventId: id } } }),
+      prisma.waitingList.deleteMany({ where: { eventId: id } }),
+      prisma.reservation.deleteMany({ where: { eventId: id } }),
+      prisma.sharedPickup.deleteMany({ where: { eventId: id } }),
+      prisma.trip.deleteMany({ where: { id: { in: tripIds } } }),
+      prisma.routeStop.deleteMany({ where: { routeId: { in: routeIds } } }),
+      prisma.route.deleteMany({ where: { eventId: id } }),
+      prisma.pickupPoint.deleteMany({ where: { eventId: id } }),
+      prisma.event.delete({ where: { id } }),
+    ]);
   }
 
   async getStats() {

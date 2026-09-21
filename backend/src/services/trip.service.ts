@@ -56,7 +56,16 @@ export class TripService {
   }
 
   async delete(id: string) {
-    await prisma.trip.delete({ where: { id } }).catch(() => { throw new AppError('Trip not found', 404); });
+    const trip = await prisma.trip.findUnique({ where: { id } });
+    if (!trip) throw new AppError('Trip not found', 404);
+
+    await prisma.$transaction([
+      prisma.trackingLog.deleteMany({ where: { tripId: id } }),
+      prisma.reservation.updateMany({ where: { tripId: id }, data: { tripId: null } }),
+      prisma.waitingList.deleteMany({ where: { tripId: id } }),
+      prisma.sharedPickup.updateMany({ where: { tripId: id }, data: { tripId: null } }),
+      prisma.trip.delete({ where: { id } }),
+    ]);
   }
 
   async startTrip(id: string) {

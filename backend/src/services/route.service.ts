@@ -68,7 +68,20 @@ export class RouteService {
   }
 
   async delete(id: string) {
-    await prisma.route.delete({ where: { id } }).catch(() => { throw new AppError('Route not found', 404); });
+    const route = await prisma.route.findUnique({ where: { id } });
+    if (!route) throw new AppError('Route not found', 404);
+
+    const trips = await prisma.trip.findMany({ where: { routeId: id }, select: { id: true } });
+    const tripIds = trips.map((t) => t.id);
+
+    await prisma.$transaction([
+      prisma.trackingLog.deleteMany({ where: { tripId: { in: tripIds } } }),
+      prisma.reservation.updateMany({ where: { tripId: { in: tripIds } }, data: { tripId: null } }),
+      prisma.reservation.updateMany({ where: { routeId: id }, data: { routeId: null } }),
+      prisma.trip.deleteMany({ where: { routeId: id } }),
+      prisma.routeStop.deleteMany({ where: { routeId: id } }),
+      prisma.route.delete({ where: { id } }),
+    ]);
   }
 }
 

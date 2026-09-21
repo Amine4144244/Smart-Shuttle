@@ -199,6 +199,21 @@ export default function AdminFullPhaseConfig() {
     onError: (err: any) => toast.error(err.response?.data?.message || 'Erreur mise à jour'),
   });
 
+  const deleteEventMutation = useMutation({
+    mutationFn: (id: string) => eventsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-events-list'] });
+      toast.success('Événement supprimé avec succès');
+      setSelectedEventId(null);
+      setSearchParams({});
+      setEventName('');
+      setEventAddress('');
+      setEventDesc('');
+      setActiveTab('event');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Erreur suppression événement'),
+  });
+
   const createPickupMutation = useMutation({
     mutationFn: (d: any) => pickupPointsApi.create(d),
     onSuccess: () => {
@@ -672,14 +687,30 @@ export default function AdminFullPhaseConfig() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-border/80">
-                <span className="text-xs text-muted-foreground font-medium">
-                  {selectedEventId ? 'Modifiez et enregistrez' : 'Créez pour débloquer les phases suivantes'}
-                </span>
+              <div className="flex items-center justify-between pt-4 border-t border-border/80 flex-wrap gap-2">
+                {selectedEventId ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (window.confirm(`Voulez-vous vraiment supprimer définitivement l'événement "${eventName}" et toutes ses données associées (itinéraires, navettes, arrêts) ?`)) {
+                        deleteEventMutation.mutate(selectedEventId);
+                      }
+                    }}
+                    disabled={deleteEventMutation.isPending}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 font-bold text-xs"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1.5" /> Supprimer cet Événement
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Créez pour débloquer les phases suivantes
+                  </span>
+                )}
                 <Button
                   onClick={handleSaveEvent}
                   disabled={createEventMutation.isPending || updateEventMutation.isPending}
-                  className="font-bold"
+                  className="font-bold ml-auto"
                 >
                   {selectedEventId ? 'Mettre à Jour' : 'Créer & Continuer'} <ArrowRight className="h-4 w-4 ml-1.5" />
                 </Button>
