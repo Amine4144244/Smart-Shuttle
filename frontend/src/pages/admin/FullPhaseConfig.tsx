@@ -101,12 +101,14 @@ export default function AdminFullPhaseConfig() {
   const [newBusCapacity, setNewBusCapacity] = useState(40);
 
   // Phase 5: Trip Form State
+  const [tripCreationMode, setTripCreationMode] = useState<'SINGLE' | 'BATCH'>('SINGLE');
   const [tripRouteId, setTripRouteId] = useState<string>('');
   const [tripVehicleId, setTripVehicleId] = useState<string>('');
   const [tripDriverId, setTripDriverId] = useState<string>('');
   const [tripDepartureTime, setTripDepartureTime] = useState('08:30');
   const [batchIntervalMinutes, setBatchIntervalMinutes] = useState(30);
-  const [batchCount, setBatchCount] = useState(4);
+  const [batchCount, setBatchCount] = useState(3);
+  const [isGeneratingBatch, setIsGeneratingBatch] = useState(false);
 
   // 1. Fetch All Events
   const { data: eventsData, isLoading: isEventsLoading } = useQuery({
@@ -246,6 +248,15 @@ export default function AdminFullPhaseConfig() {
     onError: (err: any) => toast.error(err.response?.data?.message || 'Erreur programmation navette'),
   });
 
+  const deleteTripMutation = useMutation({
+    mutationFn: (id: string) => tripsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trips-list'] });
+      toast.success('Navette supprimée');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Erreur suppression navette'),
+  });
+
   // Calculate Readiness Score
   const hasEvent = !!selectedEventId;
   const hasPickups = eventPickupPoints.length > 0;
@@ -336,6 +347,20 @@ export default function AdminFullPhaseConfig() {
       toast.error('Veuillez sélectionner un itinéraire, un véhicule, un chauffeur et une heure');
       return;
     }
+
+    // Duplicate check
+    const existingDuplicate = eventTrips.find(
+      (t: any) =>
+        t.routeId === tripRouteId &&
+        t.vehicleId === tripVehicleId &&
+        t.departureTime?.slice(0, 5) === tripDepartureTime?.slice(0, 5)
+    );
+    if (existingDuplicate) {
+      if (!window.confirm(`Une navette existe déjà pour cet itinéraire à ${tripDepartureTime}. Voulez-vous vraiment programmer un doublon ?`)) {
+        return;
+      }
+    }
+
     createTripMutation.mutate({
       routeId: tripRouteId,
       vehicleId: tripVehicleId,
@@ -345,28 +370,61 @@ export default function AdminFullPhaseConfig() {
     });
   };
 
-  const handleBatchGenerateTrips = () => {
+  const handleBatchGenerateTrips = async () => {
     if (!tripRouteId || !tripVehicleId || !tripDriverId || !eventDate) {
       toast.error('Veuillez configurer un itinéraire, un véhicule et un chauffeur pour le générateur');
       return;
     }
 
     const [hours, minutes] = tripDepartureTime.split(':').map(Number);
+    const timesToCreate: string[] = [];
     for (let i = 0; i < batchCount; i++) {
       const totalMin = hours * 60 + minutes + i * batchIntervalMinutes;
       const h = String(Math.floor(totalMin / 60) % 24).padStart(2, '0');
       const m = String(totalMin % 60).padStart(2, '0');
-      const timeStr = `${h}:${m}`;
-
-      createTripMutation.mutate({
-        routeId: tripRouteId,
-        vehicleId: tripVehicleId,
-        driverId: tripDriverId,
-        date: eventDate,
-        departureTime: timeStr,
-      });
+      timesToCreate.push(`${h}:${m}`);
     }
-    toast.success(`${batchCount} navettes programmées en série`);
+
+    if (!window.confirm(`Confirmer la création en série de ${timesToCreate.length} départs (${timesToCreate.join(', ')}) ?`)) {
+      return;
+    }
+
+    setIsGeneratingBatch(true);
+    let createdCount = 0;
+    try {
+      for (const timeStr of timesToCreate) {
+        await tripsApi.create({
+          routeId: tripRouteId,
+          vehicleId: tripVehicleId,
+          driverId: tripDriverId,
+          date: eventDate,
+          departureTime: timeStr,
+        });
+        createdCount++;
+      }
+      queryClient.invalidateQueries({ queryKey: ['trips-list'] });
+      toast.success(`${createdCount} navettes programmées en série avec succès`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la génération en série');
+    } finally {
+      setIsGeneratingBatch(false);
+    }
+  };
+
+  const handleDeleteAllTrips = async () => {
+    if (eventTrips.length === 0) return;
+    if (!window.confirm(`Voulez-vous vraiment supprimer toutes les ${eventTrips.length} navettes de cet événement ?`)) {
+      return;
+    }
+    try {
+      for (const t of eventTrips) {
+        await tripsApi.delete(t.id);
+      }
+      queryClient.invalidateQueries({ queryKey: ['trips-list'] });
+      toast.success('Toutes les navettes de cet événement ont été supprimées');
+    } catch {
+      toast.error('Erreur lors de la suppression des navettes');
+    }
   };
 
   const passengerBookingUrl = `${window.location.origin}/participant/bookings`;
@@ -1117,10 +1175,38 @@ export default function AdminFullPhaseConfig() {
         <div className="grid gap-6 lg:grid-cols-12 animate-in fade-in duration-200">
           <div className="lg:col-span-5 space-y-4">
             <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-sm space-y-4">
-              <h2 className="text-base font-black tracking-tight text-foreground flex items-center gap-2">
-                <Bus className="h-4 w-4 text-primary" />
-                Planifier une Navette
-              </h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                  <Bus className="h-4 w-4 text-primary" />
+                  Programmation des Navettes
+                </h2>
+              </div>
+
+              {/* Mode Toggle: Single Trip vs Batch Generator */}
+              <div className="grid grid-cols-2 p-1 bg-muted/60 rounded-xl gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setTripCreationMode('SINGLE')}
+                  className={`py-2 px-3 rounded-lg font-bold transition-all ${
+                    tripCreationMode === 'SINGLE'
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Départ Unique (1)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTripCreationMode('BATCH')}
+                  className={`py-2 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    tripCreationMode === 'BATCH'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Sliders className="h-3 w-3" /> Multi-Départs
+                </button>
+              </div>
 
               <div className="space-y-3">
                 <div className="space-y-1">
@@ -1141,7 +1227,7 @@ export default function AdminFullPhaseConfig() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs font-bold uppercase text-muted-foreground">Bus</Label>
+                    <Label className="text-xs font-bold uppercase text-muted-foreground">Bus Navette</Label>
                     <select
                       value={tripVehicleId}
                       onChange={(e) => setTripVehicleId(e.target.value)}
@@ -1173,65 +1259,107 @@ export default function AdminFullPhaseConfig() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">Heure de Départ Initiale</Label>
-                  <Input
-                    type="time"
-                    value={tripDepartureTime}
-                    onChange={(e) => setTripDepartureTime(e.target.value)}
-                  />
-                </div>
-
-                <Button
-                  onClick={handleCreateTrip}
-                  disabled={createTripMutation.isPending}
-                  className="w-full font-bold"
-                >
-                  <Plus className="h-4 w-4 mr-1.5" /> Programmer cette Navette
-                </Button>
-
-                {/* Générateur Récurrent en Série */}
-                <div className="pt-3 border-t border-border/60 space-y-2">
-                  <Label className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5">
-                    <Sliders className="h-3 w-3 text-primary" /> Générateur Multi-Départs Automatique :
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] text-muted-foreground">Intervalle (min)</span>
+                {tripCreationMode === 'SINGLE' ? (
+                  /* SINGLE TRIP FORM */
+                  <div className="space-y-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Heure de Départ</Label>
                       <Input
-                        type="number"
-                        value={batchIntervalMinutes}
-                        onChange={(e) => setBatchIntervalMinutes(Number(e.target.value))}
-                        className="h-8 text-xs"
+                        type="time"
+                        value={tripDepartureTime}
+                        onChange={(e) => setTripDepartureTime(e.target.value)}
                       />
                     </div>
-                    <div>
-                      <span className="text-[10px] text-muted-foreground">Nombre de Navettes</span>
-                      <Input
-                        type="number"
-                        value={batchCount}
-                        onChange={(e) => setBatchCount(Number(e.target.value))}
-                        className="h-8 text-xs"
-                      />
-                    </div>
+
+                    <Button
+                      onClick={handleCreateTrip}
+                      disabled={createTripMutation.isPending}
+                      className="w-full font-bold shadow-sm"
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" /> Programmer 1 Seule Navette
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleBatchGenerateTrips}
-                    className="w-full text-xs font-bold"
-                  >
-                    ⚡ Générer {batchCount} Départs en Série
-                  </Button>
-                </div>
+                ) : (
+                  /* BATCH GENERATOR FORM */
+                  <div className="space-y-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">1er Départ</Label>
+                      <Input
+                        type="time"
+                        value={tripDepartureTime}
+                        onChange={(e) => setTripDepartureTime(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Intervalle (min)</Label>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={240}
+                          step={5}
+                          value={batchIntervalMinutes}
+                          onChange={(e) => setBatchIntervalMinutes(Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Nombre de Navettes</Label>
+                        <Input
+                          type="number"
+                          min={2}
+                          max={20}
+                          value={batchCount}
+                          onChange={(e) => setBatchCount(Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Live preview of scheduled times */}
+                    <div className="p-3 rounded-xl bg-muted/40 border border-border/60 space-y-1.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Aperçu des horaires générés :
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Array.from({ length: Math.min(batchCount, 8) }).map((_, idx) => {
+                          const [hStr, mStr] = tripDepartureTime.split(':');
+                          const total = Number(hStr || 8) * 60 + Number(mStr || 0) + idx * batchIntervalMinutes;
+                          const hh = String(Math.floor(total / 60) % 24).padStart(2, '0');
+                          const mm = String(total % 60).padStart(2, '0');
+                          return (
+                            <Badge key={idx} variant="secondary" className="font-mono text-[11px] px-2 py-0.5">
+                              {hh}:{mm}
+                            </Badge>
+                          );
+                        })}
+                        {batchCount > 8 && (
+                          <span className="text-[10px] text-muted-foreground self-center">
+                            +{batchCount - 8} de plus
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={handleBatchGenerateTrips}
+                      disabled={isGeneratingBatch}
+                      className="w-full font-bold bg-primary hover:bg-primary/90"
+                    >
+                      <Sliders className="h-4 w-4 mr-1.5" />
+                      {isGeneratingBatch
+                        ? 'Génération en cours...'
+                        : `Générer ${batchCount} Navettes en Série`}
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           <div className="lg:col-span-7 space-y-4">
             <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="font-black text-base text-foreground">
                     Planning des Navettes ({eventTrips.length})
@@ -1240,14 +1368,27 @@ export default function AdminFullPhaseConfig() {
                     Navettes programmées pour cet événement
                   </p>
                 </div>
-                <Button
-                  onClick={() => setActiveTab('launchpad')}
-                  variant="outline"
-                  size="sm"
-                  className="font-bold text-xs"
-                >
-                  Phase 6 : Audit & Lancement <ArrowRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
+
+                <div className="flex items-center gap-2">
+                  {eventTrips.length > 0 && (
+                    <Button
+                      onClick={handleDeleteAllTrips}
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30 font-bold text-xs"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Supprimer tout
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => setActiveTab('launchpad')}
+                    variant="outline"
+                    size="sm"
+                    className="font-bold text-xs"
+                  >
+                    Phase 6 : Audit & Lancement <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                  </Button>
+                </div>
               </div>
 
               {eventTrips.length === 0 ? (
@@ -1263,10 +1404,15 @@ export default function AdminFullPhaseConfig() {
                   {eventTrips.map((t: any) => (
                     <div
                       key={t.id}
-                      className="p-3.5 rounded-2xl border border-border bg-background flex items-center justify-between gap-3 text-xs shadow-2xs"
+                      className="p-3.5 rounded-2xl border border-border bg-background flex items-center justify-between gap-3 text-xs shadow-2xs hover:border-border/80 transition-colors"
                     >
                       <div className="space-y-0.5 min-w-0">
-                        <p className="font-bold text-foreground truncate">{t.route?.name || 'Navette Express'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-foreground truncate">{t.route?.name || 'Navette Express'}</p>
+                          <Badge className={getStatusColor(t.status)}>
+                            {t.status ? t.status.replace('_', ' ') : 'SCHEDULED'}
+                          </Badge>
+                        </div>
                         <p className="text-[11px] text-muted-foreground font-mono">
                           Départ : <strong className="text-primary">{formatTime(t.departureTime)}</strong> • {formatDate(t.date)}
                         </p>
@@ -1275,9 +1421,21 @@ export default function AdminFullPhaseConfig() {
                         </p>
                       </div>
 
-                      <Badge className={getStatusColor(t.status)}>
-                        {t.status ? t.status.replace('_', ' ') : 'SCHEDULED'}
-                      </Badge>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (window.confirm(`Supprimer la navette de ${formatTime(t.departureTime)} ?`)) {
+                              deleteTripMutation.mutate(t.id);
+                            }
+                          }}
+                          disabled={deleteTripMutation.isPending}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
