@@ -2,7 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 
 export class TripService {
-  async findAll(params: { page?: number; limit?: number; status?: string; driverId?: string; routeId?: string; date?: string }) {
+  async findAll(params: { page?: number; limit?: number; status?: string; driverId?: string; routeId?: string; date?: string; eventId?: string }) {
     const page = Number(params.page) || 1;
     const limit = Number(params.limit) || 10;
     const skip = (page - 1) * limit;
@@ -11,6 +11,7 @@ export class TripService {
     if (params.status) where.status = params.status;
     if (params.driverId) where.driverId = params.driverId;
     if (params.routeId) where.routeId = params.routeId;
+    if (params.eventId) where.route = { eventId: params.eventId };
     if (params.date) where.date = { gte: new Date(params.date) };
 
     const [data, total] = await Promise.all([

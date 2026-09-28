@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { eventsApi, reservationsApi, pickupPointsApi, tripsApi } from '@/services/api';
@@ -62,14 +62,12 @@ export default function ParticipantBookings() {
     enabled: !!selectedEvent,
   });
 
-  const { data: tripsData } = useQuery({
-    queryKey: ['trips-list'],
-    queryFn: () => tripsApi.getAll({ limit: 100 }).then((r) => r.data),
+  const { data: eventTripsData, isLoading: isTripsLoading } = useQuery({
+    queryKey: ['trips-event', selectedEvent],
+    queryFn: () => tripsApi.getAll({ eventId: selectedEvent!, limit: 100 }).then((r) => r.data),
+    enabled: !!selectedEvent,
   });
-  const allTrips = tripsData?.data || [];
-  const eventTrips = allTrips
-    .filter((t: any) => t.route?.eventId === selectedEvent)
-    .sort((a: any, b: any) => (a.departureTime || '').localeCompare(b.departureTime || ''));
+  const eventTrips = eventTripsData?.data || [];
 
   const bookedEventIds = new Set(
     (Array.isArray(myReservations) ? myReservations : [])
@@ -78,6 +76,27 @@ export default function ParticipantBookings() {
   );
 
   const selectedEventObj = events?.data?.find((e: any) => e.id === selectedEvent);
+
+  // Synchronize pickup schedule with scheduled shuttle departures
+  useEffect(() => {
+    if (!selectedEvent) return;
+    if (eventTrips.length > 0) {
+      const sortedTrips = [...eventTrips].sort((a: any, b: any) => {
+        const dateA = `${a.date ? a.date.split('T')[0] : ''}T${a.departureTime ? a.departureTime.slice(0, 5) : '00:00'}`;
+        const dateB = `${b.date ? b.date.split('T')[0] : ''}T${b.departureTime ? b.departureTime.slice(0, 5) : '00:00'}`;
+        return dateA.localeCompare(dateB);
+      });
+      const firstTrip = sortedTrips[0];
+      setSelectedTripId(firstTrip.id);
+      const tripDateStr = firstTrip.date ? firstTrip.date.split('T')[0] : (selectedEventObj?.date ? selectedEventObj.date.split('T')[0] : '');
+      const timePart = firstTrip.departureTime ? firstTrip.departureTime.slice(0, 5) : '08:30';
+      setPickupTime(`${tripDateStr}T${timePart}`);
+    } else if (selectedEventObj) {
+      const eventDateStr = selectedEventObj.date ? selectedEventObj.date.split('T')[0] : '';
+      const timePart = selectedEventObj.startTime ? selectedEventObj.startTime.slice(0, 5) : '09:00';
+      setPickupTime(`${eventDateStr}T${timePart}`);
+    }
+  }, [eventTrips, selectedEvent, selectedEventObj]);
 
   const bookMutation = useMutation({
     mutationFn: (data: any) => reservationsApi.create(data),
@@ -199,25 +218,15 @@ export default function ParticipantBookings() {
       return;
     }
     setSelectedEvent(event.id);
-    const eventDateStr = typeof event.date === 'string' ? event.date.split('T')[0] : new Date(event.date).toISOString().split('T')[0];
-
-    // Find if there are trips scheduled for this event by the admin
-    const tripsForThisEvent = allTrips
-      .filter((t: any) => t.route?.eventId === event.id)
-      .sort((a: any, b: any) => (a.departureTime || '').localeCompare(b.departureTime || ''));
-
-    if (tripsForThisEvent.length > 0) {
-      const firstTrip = tripsForThisEvent[0];
-      const tripDateStr = firstTrip.date ? firstTrip.date.split('T')[0] : eventDateStr;
-      const tripTimePart = (firstTrip.departureTime || event.startTime || '09:00').slice(0, 5);
-      setPickupTime(`${tripDateStr}T${tripTimePart}`);
-      setSelectedTripId(firstTrip.id);
-    } else {
-      const timePart = (event.startTime || '09:00').slice(0, 5);
-      setPickupTime(`${eventDateStr}T${timePart}`);
-      setSelectedTripId(null);
-    }
+    setSelectedTripId(null);
     setStep('select-pickup');
+  };
+
+  const handleSelectTrip = (trip: any) => {
+    setSelectedTripId(trip.id);
+    const tripDateStr = trip.date ? trip.date.split('T')[0] : (selectedEventObj?.date ? selectedEventObj.date.split('T')[0] : '');
+    const timePart = trip.departureTime ? trip.departureTime.slice(0, 5) : '08:30';
+    setPickupTime(`${tripDateStr}T${timePart}`);
   };
 
   const handleSelectPickupPoint = (point: any) => {
@@ -575,83 +584,62 @@ export default function ParticipantBookings() {
                   </div>
                 </div>
 
-                {/* Official Shuttle Departures Created by Admin */}
-                {eventTrips.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
-                        <Bus className="h-3.5 w-3.5 text-[#ffac00]" />
-                        Official Shuttle Schedule ({eventTrips.length} departures)
-                      </label>
-                      <span className="text-[10px] font-mono text-[#629b5c] font-bold">Event Scheduled</span>
-                    </div>
+                {/* Scheduled Shuttle Departures (Programmé par l'Admin) */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
+                      <Bus className="h-3.5 w-3.5 text-[#ffac00]" />
+                      Scheduled Shuttle Departures
+                    </label>
+                    <span className="text-[10px] text-neutral-400 font-mono">
+                      {eventTrips.length} departure{eventTrips.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {isTripsLoading ? (
+                    <div className="h-12 rounded-2xl bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
+                  ) : eventTrips.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pr-1">
                       {eventTrips.map((t: any) => {
-                        const isTripSelected = selectedTripId === t.id;
-                        const timeFormatted = t.departureTime ? t.departureTime.slice(0, 5) : '08:30';
-                        const tripDateFormatted = t.date ? formatDate(t.date) : '';
-                        const capacityLeft = Math.max(0, (t.vehicle?.capacity || 40) - (t._count?.reservations || 0));
-
+                        const isSelected = selectedTripId === t.id;
+                        const timeStr = t.departureTime ? t.departureTime.slice(0, 5) : '08:00';
+                        const tripDateStr = t.date ? formatDate(t.date) : '';
                         return (
                           <div
                             key={t.id}
-                            onClick={() => {
-                              setSelectedTripId(t.id);
-                              const tDateStr = t.date ? t.date.split('T')[0] : (selectedEventObj?.date ? selectedEventObj.date.split('T')[0] : '');
-                              setPickupTime(`${tDateStr}T${timeFormatted}`);
-                              if (t.route?.origin && !pickupAddress) {
-                                setPickupAddress(t.route.origin);
-                              }
-                            }}
+                            onClick={() => handleSelectTrip(t)}
                             className={`p-2.5 rounded-2xl border cursor-pointer transition-all ${
-                              isTripSelected
-                                ? 'border-[#ffac00] bg-[#ffac00]/10 text-neutral-950 dark:text-white font-bold shadow-xs'
+                              isSelected
+                                ? 'border-[#ffac00] bg-[#ffac00]/10 text-neutral-950 dark:text-white shadow-xs font-bold'
                                 : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/40 text-neutral-700 dark:text-neutral-300'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-1">
                               <div className="flex items-center gap-1.5">
-                                <Clock className="h-3.5 w-3.5 text-[#ffac00]" />
-                                <span className="text-xs font-black font-mono">{timeFormatted}</span>
+                                <Clock className={`h-3.5 w-3.5 ${isSelected ? 'text-[#ffac00]' : 'text-neutral-400'}`} />
+                                <span className="text-xs font-extrabold font-mono">{timeStr}</span>
                               </div>
-                              {isTripSelected ? (
-                                <CheckCircle2 className="h-4 w-4 text-[#ffac00] shrink-0" />
-                              ) : (
-                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
-                                  {capacityLeft} seats
-                                </span>
-                              )}
+                              {isSelected && <Check className="h-3.5 w-3.5 text-[#ffac00] shrink-0" />}
                             </div>
-                            <div className="mt-1 text-[10px] text-neutral-400 truncate flex items-center justify-between">
-                              <span className="truncate">{t.route?.name || t.vehicle?.busNumber || 'Shuttle'}</span>
-                              <span className="shrink-0 text-neutral-500 font-mono">{tripDateFormatted}</span>
+                            <div className="mt-1 flex items-center justify-between text-[10px] text-neutral-400">
+                              <span>{tripDateStr}</span>
+                              <span className="truncate max-w-[90px]">{t.vehicle?.busNumber || 'Bus'}</span>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/50 border border-neutral-200/80 dark:border-neutral-800 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                        Event Standard Window
-                      </span>
-                      <span className="text-[10px] font-mono text-[#ffac00] font-bold">
-                        {selectedEventObj?.startTime || '09:00'} {selectedEventObj?.endTime ? `— ${selectedEventObj.endTime}` : ''}
-                      </span>
+                  ) : (
+                    <div className="p-3 rounded-2xl border border-dashed border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-400">
+                      No fixed shuttle slots yet. Set your custom pickup schedule below.
                     </div>
-                    <p className="text-[11px] text-neutral-400">
-                      Shuttle departure will be automatically synchronized with event start.
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {/* Pickup DateTime */}
                 <div className="space-y-1.5">
                   <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
-                    {eventTrips.length > 0 ? 'Selected Departure Schedule / Custom Time' : 'Pickup Schedule'}
+                    Pickup Schedule (Date & Time)
                   </label>
                   <input
                     type="datetime-local"
