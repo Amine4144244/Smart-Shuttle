@@ -1120,7 +1120,7 @@ export default function AdminFullPhaseConfig() {
                     busNumber: newBusNumber,
                     plateNumber: newPlateNumber,
                     capacity: Number(newBusCapacity),
-                    status: 'ACTIVE',
+                    status: 'AVAILABLE',
                   });
                 }}
                 disabled={createVehicleMutation.isPending}
