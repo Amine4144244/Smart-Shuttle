@@ -94,11 +94,17 @@ export default function AdminFullPhaseConfig() {
   const [routeDuration, setRouteDuration] = useState<number>(25);
 
   // Phase 4: Fleet & Driver Pairing State
+  const [fleetCreationSubTab, setFleetCreationSubTab] = useState<'BUS' | 'DRIVER'>('BUS');
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
   const [newBusNumber, setNewBusNumber] = useState('');
   const [newPlateNumber, setNewPlateNumber] = useState('');
   const [newBusCapacity, setNewBusCapacity] = useState(40);
+  const [newDriverFirstName, setNewDriverFirstName] = useState('');
+  const [newDriverLastName, setNewDriverLastName] = useState('');
+  const [newDriverEmail, setNewDriverEmail] = useState('');
+  const [newDriverPhone, setNewDriverPhone] = useState('');
+  const [newDriverLicense, setNewDriverLicense] = useState('');
 
   // Phase 5: Trip Form State
   const [tripCreationMode, setTripCreationMode] = useState<'SINGLE' | 'BATCH'>('SINGLE');
@@ -252,6 +258,20 @@ export default function AdminFullPhaseConfig() {
       setNewPlateNumber('');
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Erreur ajout véhicule'),
+  });
+
+  const createDriverMutation = useMutation({
+    mutationFn: (d: any) => driversApi.create(d),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['drivers-list'] });
+      toast.success('Conducteur ajouté avec succès');
+      setNewDriverFirstName('');
+      setNewDriverLastName('');
+      setNewDriverEmail('');
+      setNewDriverPhone('');
+      setNewDriverLicense('');
+    },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Erreur ajout conducteur'),
   });
 
   const createTripMutation = useMutation({
@@ -1076,58 +1096,160 @@ export default function AdminFullPhaseConfig() {
         <div className="grid gap-6 lg:grid-cols-12 animate-in fade-in duration-200">
           <div className="lg:col-span-5 space-y-4">
             <div className="p-6 rounded-3xl bg-card border border-border/80 shadow-sm space-y-4">
-              <h2 className="text-base font-black tracking-tight text-foreground flex items-center gap-2">
-                <Truck className="h-4 w-4 text-amber-500" />
-                Ajout Rapide de Navette
-              </h2>
-
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">Numéro / Code Bus</Label>
-                  <Input
-                    placeholder="ex: Bus Shuttle #04"
-                    value={newBusNumber}
-                    onChange={(e) => setNewBusNumber(e.target.value)}
-                    className="font-bold"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">Immatriculation</Label>
-                  <Input
-                    placeholder="ex: 12345-A-1"
-                    value={newPlateNumber}
-                    onChange={(e) => setNewPlateNumber(e.target.value)}
-                    className="font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-bold uppercase text-muted-foreground">Capacité (Places assises)</Label>
-                  <Input
-                    type="number"
-                    value={newBusCapacity}
-                    onChange={(e) => setNewBusCapacity(Number(e.target.value))}
-                  />
-                </div>
+              <div className="grid grid-cols-2 p-1 bg-muted/60 rounded-xl gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFleetCreationSubTab('BUS')}
+                  className={`py-2 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    fleetCreationSubTab === 'BUS'
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Truck className="h-3.5 w-3.5" /> + Navette / Bus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFleetCreationSubTab('DRIVER')}
+                  className={`py-2 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    fleetCreationSubTab === 'DRIVER'
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <UserCircle className="h-3.5 w-3.5" /> + Chauffeur
+                </button>
               </div>
 
-              <Button
-                onClick={() => {
-                  if (!newBusNumber || !newPlateNumber) {
-                    toast.error('Veuillez renseigner le numéro et la plaque du bus');
-                    return;
-                  }
-                  createVehicleMutation.mutate({
-                    busNumber: newBusNumber,
-                    plateNumber: newPlateNumber,
-                    capacity: Number(newBusCapacity),
-                    status: 'AVAILABLE',
-                  });
-                }}
-                disabled={createVehicleMutation.isPending}
-                className="w-full font-bold"
-              >
-                <Plus className="h-4 w-4 mr-1.5" /> Ajouter à la Flotte
-              </Button>
+              {fleetCreationSubTab === 'BUS' ? (
+                <div className="space-y-3">
+                  <h2 className="text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-amber-500" />
+                    Ajout Rapide de Navette
+                  </h2>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Numéro / Code Bus</Label>
+                      <Input
+                        placeholder="ex: Bus Shuttle #04"
+                        value={newBusNumber}
+                        onChange={(e) => setNewBusNumber(e.target.value)}
+                        className="font-bold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Immatriculation</Label>
+                      <Input
+                        placeholder="ex: 12345-A-1"
+                        value={newPlateNumber}
+                        onChange={(e) => setNewPlateNumber(e.target.value)}
+                        className="font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Capacité (Places assises)</Label>
+                      <Input
+                        type="number"
+                        value={newBusCapacity}
+                        onChange={(e) => setNewBusCapacity(Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      if (!newBusNumber || !newPlateNumber) {
+                        toast.error('Veuillez renseigner le numéro et la plaque du bus');
+                        return;
+                      }
+                      createVehicleMutation.mutate({
+                        busNumber: newBusNumber,
+                        plateNumber: newPlateNumber,
+                        capacity: Number(newBusCapacity),
+                        status: 'AVAILABLE',
+                      });
+                    }}
+                    disabled={createVehicleMutation.isPending}
+                    className="w-full font-bold"
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" /> Ajouter à la Flotte
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <h2 className="text-base font-black tracking-tight text-foreground flex items-center gap-2">
+                    <UserCircle className="h-4 w-4 text-primary" />
+                    Ajout Rapide de Conducteur
+                  </h2>
+
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Prénom</Label>
+                        <Input
+                          placeholder="ex: Karim"
+                          value={newDriverFirstName}
+                          onChange={(e) => setNewDriverFirstName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs font-bold uppercase text-muted-foreground">Nom</Label>
+                        <Input
+                          placeholder="ex: Idrissi"
+                          value={newDriverLastName}
+                          onChange={(e) => setNewDriverLastName(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Email</Label>
+                      <Input
+                        type="email"
+                        placeholder="ex: chauffeur@shuttle.com"
+                        value={newDriverEmail}
+                        onChange={(e) => setNewDriverEmail(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Téléphone</Label>
+                      <Input
+                        placeholder="ex: +212600112233"
+                        value={newDriverPhone}
+                        onChange={(e) => setNewDriverPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-bold uppercase text-muted-foreground">Numéro de Permis</Label>
+                      <Input
+                        placeholder="ex: PERM-44921"
+                        value={newDriverLicense}
+                        onChange={(e) => setNewDriverLicense(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={() => {
+                      if (!newDriverFirstName || !newDriverLastName || !newDriverEmail || !newDriverLicense) {
+                        toast.error('Veuillez remplir le prénom, nom, email et permis');
+                        return;
+                      }
+                      createDriverMutation.mutate({
+                        firstName: newDriverFirstName,
+                        lastName: newDriverLastName,
+                        email: newDriverEmail,
+                        phone: newDriverPhone || '+212600000000',
+                        licenseNumber: newDriverLicense,
+                      });
+                    }}
+                    disabled={createDriverMutation.isPending}
+                    className="w-full font-bold"
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" /> Enregistrer le Conducteur
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1158,19 +1280,25 @@ export default function AdminFullPhaseConfig() {
                   <Label className="text-xs font-bold uppercase text-muted-foreground block">
                     Véhicules ({allVehicles.length})
                   </Label>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {allVehicles.map((v: any) => (
-                      <div key={v.id} className="p-3 rounded-xl border border-border bg-background flex items-center justify-between text-xs">
-                        <div>
-                          <p className="font-bold text-foreground">{v.busNumber}</p>
-                          <p className="font-mono text-[10px] text-muted-foreground">{v.plateNumber}</p>
+                  {allVehicles.length === 0 ? (
+                    <div className="p-4 text-center rounded-xl border border-dashed border-border bg-muted/20">
+                      <p className="text-xs text-muted-foreground">Aucun véhicule enregistré</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {allVehicles.map((v: any) => (
+                        <div key={v.id} className="p-3 rounded-xl border border-border bg-background flex items-center justify-between text-xs">
+                          <div>
+                            <p className="font-bold text-foreground">{v.busNumber}</p>
+                            <p className="font-mono text-[10px] text-muted-foreground">{v.plateNumber}</p>
+                          </div>
+                          <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold">
+                            {v.capacity} pl.
+                          </span>
                         </div>
-                        <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-bold">
-                          {v.capacity} pl.
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Drivers Column */}
@@ -1178,22 +1306,31 @@ export default function AdminFullPhaseConfig() {
                   <Label className="text-xs font-bold uppercase text-muted-foreground block">
                     Conducteurs ({allDrivers.length})
                   </Label>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {allDrivers.map((d: any) => (
-                      <div key={d.id} className="p-3 rounded-xl border border-border bg-background flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <UserCircle className="h-6 w-6 text-muted-foreground shrink-0" />
-                          <div className="min-w-0">
-                            <p className="font-bold text-foreground truncate">{d.user?.firstName} {d.user?.lastName}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{d.phone || 'Sans tel'}</p>
+                  {allDrivers.length === 0 ? (
+                    <div className="p-4 text-center rounded-xl border border-dashed border-border bg-muted/20">
+                      <p className="text-xs text-muted-foreground">Aucun conducteur enregistré</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {allDrivers.map((d: any) => {
+                        const driverName = [d.user?.firstName, d.user?.lastName].filter(Boolean).join(' ') || d.user?.email || d.licenseNumber || `Chauffeur #${d.id?.slice(0, 4)}`;
+                        return (
+                          <div key={d.id} className="p-3 rounded-xl border border-border bg-background flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <UserCircle className="h-6 w-6 text-muted-foreground shrink-0" />
+                              <div className="min-w-0">
+                                <p className="font-bold text-foreground truncate">{driverName}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{d.user?.phone || d.phone || d.licenseNumber || 'Sans tel'}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                              ★ {d.rating || 5.0}
+                            </Badge>
                           </div>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] font-mono shrink-0">
-                          ★ {d.rating || 5.0}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1280,13 +1417,25 @@ export default function AdminFullPhaseConfig() {
                       onChange={(e) => setTripDriverId(e.target.value)}
                       className="w-full h-10 rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="">-- Chauffeur --</option>
-                      {allDrivers.map((d: any) => (
-                        <option key={d.id} value={d.id}>
-                          {d.user?.firstName} {d.user?.lastName}
-                        </option>
-                      ))}
+                      <option value="">
+                        {allDrivers.length === 0 ? '-- Aucun conducteur --' : '-- Choisir un Chauffeur --'}
+                      </option>
+                      {allDrivers.map((d: any) => {
+                        const name = [d.user?.firstName, d.user?.lastName].filter(Boolean).join(' ') || d.user?.email || d.licenseNumber || `Chauffeur #${d.id?.slice(0, 4)}`;
+                        const detail = d.phone || d.user?.phone || d.licenseNumber ? ` (${d.phone || d.user?.phone || d.licenseNumber})` : '';
+                        return (
+                          <option key={d.id} value={d.id}>
+                            {name}{detail}
+                          </option>
+                        );
+                      })}
                     </select>
+                    {allDrivers.length === 0 && (
+                      <p className="text-[10px] text-amber-500 font-semibold flex items-center gap-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        Ajoutez des chauffeurs dans la Phase 4
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -1432,43 +1581,46 @@ export default function AdminFullPhaseConfig() {
                 </div>
               ) : (
                 <div className="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
-                  {eventTrips.map((t: any) => (
-                    <div
-                      key={t.id}
-                      className="p-3.5 rounded-2xl border border-border bg-background flex items-center justify-between gap-3 text-xs shadow-2xs hover:border-border/80 transition-colors"
-                    >
-                      <div className="space-y-0.5 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-foreground truncate">{t.route?.name || 'Navette Express'}</p>
-                          <Badge className={getStatusColor(t.status)}>
-                            {t.status ? t.status.replace('_', ' ') : 'SCHEDULED'}
-                          </Badge>
+                  {eventTrips.map((t: any) => {
+                    const driverName = [t.driver?.user?.firstName, t.driver?.user?.lastName].filter(Boolean).join(' ') || t.driver?.user?.email || t.driver?.licenseNumber || 'Non assigné';
+                    return (
+                      <div
+                        key={t.id}
+                        className="p-3.5 rounded-2xl border border-border bg-background flex items-center justify-between gap-3 text-xs shadow-2xs hover:border-border/80 transition-colors"
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-bold text-foreground truncate">{t.route?.name || 'Navette Express'}</p>
+                            <Badge className={getStatusColor(t.status)}>
+                              {t.status ? t.status.replace('_', ' ') : 'SCHEDULED'}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground font-mono">
+                            Départ : <strong className="text-primary">{formatTime(t.departureTime)}</strong> • {formatDate(t.date)}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            Bus: {t.vehicle?.busNumber || 'N/A'} • Chauffeur: {driverName}
+                          </p>
                         </div>
-                        <p className="text-[11px] text-muted-foreground font-mono">
-                          Départ : <strong className="text-primary">{formatTime(t.departureTime)}</strong> • {formatDate(t.date)}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Bus: {t.vehicle?.busNumber} • Chauffeur: {t.driver?.user?.firstName} {t.driver?.user?.lastName}
-                        </p>
-                      </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (window.confirm(`Supprimer la navette de ${formatTime(t.departureTime)} ?`)) {
-                              deleteTripMutation.mutate(t.id);
-                            }
-                          }}
-                          disabled={deleteTripMutation.isPending}
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (window.confirm(`Supprimer la navette de ${formatTime(t.departureTime)} ?`)) {
+                                deleteTripMutation.mutate(t.id);
+                              }
+                            }}
+                            disabled={deleteTripMutation.isPending}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
