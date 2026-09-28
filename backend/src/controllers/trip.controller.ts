@@ -5,7 +5,19 @@ import { AppError } from '../middleware/error.middleware';
 
 export class TripController {
   async findAll(req: Request, res: Response, next: NextFunction) {
-    try { const result = await tripService.findAll(req.query as any); res.json(result); }
+    try {
+      const params = { ...req.query } as any;
+      if (req.user?.role === 'DRIVER') {
+        const driver = await prisma.driver.findUnique({ where: { userId: req.user.userId } });
+        if (driver) {
+          params.driverId = driver.id;
+        } else {
+          return res.json({ data: [], total: 0, page: 1, limit: 10, totalPages: 0 });
+        }
+      }
+      const result = await tripService.findAll(params);
+      res.json(result);
+    }
     catch (error) { next(error); }
   }
 
@@ -99,7 +111,24 @@ export class TripController {
   }
 
   async getActiveTrips(req: Request, res: Response, next: NextFunction) {
-    try { const trips = await tripService.getActiveTrips(); res.json(trips); }
+    try {
+      if (req.user?.role === 'DRIVER') {
+        const driver = await prisma.driver.findUnique({ where: { userId: req.user.userId } });
+        if (!driver) return res.json([]);
+        const trips = await prisma.trip.findMany({
+          where: { driverId: driver.id, status: { in: ['IN_PROGRESS', 'SCHEDULED', 'DELAYED'] } },
+          include: {
+            driver: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+            vehicle: true,
+            route: { include: { event: true, stops: { orderBy: { order: 'asc' } } } },
+            _count: { select: { reservations: true } },
+          },
+        });
+        return res.json(trips);
+      }
+      const trips = await tripService.getActiveTrips();
+      res.json(trips);
+    }
     catch (error) { next(error); }
   }
 }

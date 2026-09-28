@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatDate, formatTime, getStatusColor } from '@/lib/utils';
-import { Play, CheckCircle2, Clock, Users, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Play, CheckCircle2, Clock, Users, ChevronDown, ChevronUp, Search, Bus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function DriverTrips() {
@@ -52,8 +52,23 @@ export default function DriverTrips() {
         <p className="text-muted-foreground">Your assigned trips and passenger boarding</p>
       </div>
 
-      <div className="space-y-4">
-        {data?.data?.map((trip: any) => {
+      {(!data?.data || data.data.length === 0) ? (
+        <Card className="rounded-3xl border-dashed">
+          <CardContent className="p-12 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto text-muted-foreground">
+              <Bus className="h-6 w-6 text-primary" />
+            </div>
+            <div className="space-y-1 max-w-sm mx-auto">
+              <h3 className="text-base font-bold">No Trips Assigned Yet</h3>
+              <p className="text-xs text-muted-foreground">
+                You have not been assigned to any event shuttle runs yet. When an event organizer selects you during the shuttle programming phase, your assigned trips will appear here automatically.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {data.data.map((trip: any) => {
           const isExpanded = expandedTrip === trip.id;
           return (
             <Card key={trip.id}>
@@ -144,10 +159,8 @@ export default function DriverTrips() {
             </Card>
           );
         })}
-        {data?.data?.length === 0 && (
-          <div className="py-16 text-center text-muted-foreground">No trips assigned yet</div>
-        )}
       </div>
+      )}
     </div>
   );
 }

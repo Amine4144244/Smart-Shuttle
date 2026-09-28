@@ -150,8 +150,9 @@ export class DashboardService {
         where: { trip: { driverId }, status: { in: ['CHECKED_IN', 'COMPLETED'] } },
       }),
       prisma.trip.findFirst({
-        where: { driverId, status: 'IN_PROGRESS' },
-        include: { route: { include: { event: true } }, vehicle: true, reservations: { include: { participant: true } } },
+        where: { driverId, status: { in: ['IN_PROGRESS', 'SCHEDULED', 'DELAYED'] } },
+        orderBy: [{ status: 'asc' }, { departureTime: 'asc' }],
+        include: { route: { include: { event: true, stops: { orderBy: { order: 'asc' } } } }, vehicle: true, reservations: { include: { participant: true, pickupPoint: true } } },
       }),
     ]);
 

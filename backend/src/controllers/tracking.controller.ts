@@ -42,9 +42,9 @@ export class TrackingController {
       const driver = await prisma.driver.findUnique({ where: { userId: req.user!.userId } });
       if (!driver) throw new AppError('Driver profile not found', 404);
       const trip = await prisma.trip.findFirst({
-        where: { driverId: driver.id, status: { in: ['SCHEDULED', 'IN_PROGRESS', 'DELAYED'] }, date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
-        orderBy: { departureTime: 'asc' },
-        include: { route: { include: { stops: { orderBy: { order: 'asc' } } } }, vehicle: true, reservations: { include: { participant: true, pickupPoint: true } } },
+        where: { driverId: driver.id, status: { in: ['IN_PROGRESS', 'SCHEDULED', 'DELAYED'] } },
+        orderBy: [{ status: 'asc' }, { departureTime: 'asc' }],
+        include: { route: { include: { event: true, stops: { orderBy: { order: 'asc' } } } }, vehicle: true, reservations: { include: { participant: true, pickupPoint: true } } },
       });
       res.json(trip);
     } catch (error) { next(error); }
