@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { eventsApi, reservationsApi, pickupPointsApi } from '@/services/api';
+import { eventsApi, reservationsApi, pickupPointsApi, tripsApi } from '@/services/api';
 import { formatDate } from '@/lib/utils';
 import {
   Calendar,
@@ -60,6 +60,13 @@ export default function ParticipantBookings() {
     queryFn: () => pickupPointsApi.getAll({ eventId: selectedEvent! }).then((r) => r.data),
     enabled: !!selectedEvent,
   });
+
+  const { data: tripsData } = useQuery({
+    queryKey: ['trips-list'],
+    queryFn: () => tripsApi.getAll({ limit: 100 }).then((r) => r.data),
+  });
+  const allTrips = tripsData?.data || [];
+  const eventTrips = allTrips.filter((t: any) => t.route?.eventId === selectedEvent);
 
   const bookedEventIds = new Set(
     (Array.isArray(myReservations) ? myReservations : [])
@@ -187,10 +194,20 @@ export default function ParticipantBookings() {
       return;
     }
     setSelectedEvent(event.id);
-    const eventDate = new Date(event.date);
-    const timePart = event.startTime || '09:00';
-    const combinedStr = `${eventDate.toISOString().split('T')[0]}T${timePart}`;
-    setPickupTime(combinedStr);
+    const eventDateStr = event.date ? event.date.split('T')[0] : '';
+    const tripsForThisEvent = allTrips.filter((t: any) => t.route?.eventId === event.id);
+    let initialPickupTime = '';
+    if (tripsForThisEvent.length > 0) {
+      const sortedTrips = [...tripsForThisEvent].sort((a, b) => (a.departureTime || '').localeCompare(b.departureTime || ''));
+      const firstTrip = sortedTrips[0];
+      const tripDateStr = firstTrip.date ? firstTrip.date.split('T')[0] : eventDateStr;
+      const tripTimeStr = firstTrip.departureTime ? firstTrip.departureTime.slice(0, 5) : (event.startTime ? event.startTime.slice(0, 5) : '08:30');
+      initialPickupTime = `${tripDateStr}T${tripTimeStr}`;
+    } else {
+      const timePart = event.startTime ? event.startTime.slice(0, 5) : '08:30';
+      initialPickupTime = eventDateStr ? `${eventDateStr}T${timePart}` : '';
+    }
+    setPickupTime(initialPickupTime);
     setStep('select-pickup');
   };
 
@@ -550,10 +567,60 @@ export default function ParticipantBookings() {
                 </div>
 
                 {/* Pickup DateTime */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
-                    Pickup Schedule
-                  </label>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                      Pickup Schedule
+                    </label>
+                    {eventTrips.length > 0 && (
+                      <span className="text-[10px] text-[#ffac00] font-bold font-mono">
+                        {eventTrips.length} navette{eventTrips.length > 1 ? 's' : ''} programmée{eventTrips.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Programmed Shuttle Departures Chips */}
+                  {eventTrips.length > 0 ? (
+                    <div className="space-y-1.5 p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800">
+                      <p className="text-[10px] font-bold uppercase text-neutral-400">
+                        Horaires des Navettes Créées :
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pr-1">
+                        {eventTrips.map((trip: any) => {
+                          const tripDateStr = trip.date ? trip.date.split('T')[0] : (selectedEventObj.date ? selectedEventObj.date.split('T')[0] : '');
+                          const tripTimeStr = trip.departureTime ? trip.departureTime.slice(0, 5) : '08:30';
+                          const tripDateTimeVal = `${tripDateStr}T${tripTimeStr}`;
+                          const isSelected = pickupTime === tripDateTimeVal;
+
+                          return (
+                            <button
+                              key={trip.id}
+                              type="button"
+                              onClick={() => setPickupTime(tripDateTimeVal)}
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${
+                                isSelected
+                                  ? 'bg-[#ffac00] text-neutral-950 shadow-xs ring-2 ring-[#ffac00]/30 font-black'
+                                  : 'bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-800 dark:text-neutral-200 hover:border-[#ffac00]'
+                              }`}
+                            >
+                              <Bus className="h-3.5 w-3.5" />
+                              <span>{tripTimeStr}</span>
+                              {trip.route?.name && (
+                                <span className="text-[10px] opacity-70 font-sans font-normal truncate max-w-[100px]">
+                                  • {trip.route.name}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900/40 border border-neutral-200/80 dark:border-neutral-800 text-[11px] text-neutral-400">
+                      Horaire synchronisé avec l'événement ({selectedEventObj.startTime || '08:30'}).
+                    </div>
+                  )}
+
                   <input
                     type="datetime-local"
                     value={pickupTime}
