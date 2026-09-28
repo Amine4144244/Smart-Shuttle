@@ -31,7 +31,7 @@ class AuthService {
     if (error) throw new AppError(error.message, 400);
   }
 
-  async register(data: { email: string; password: string; firstName: string; lastName: string; phone?: string; role?: string }) {
+  async register(data: { email: string; password: string; firstName: string; lastName: string; phone?: string }) {
     const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
     if (existingUser) throw new AppError('An account with this email already exists', 400);
 
@@ -42,7 +42,7 @@ class AuthService {
       user_metadata: {
         firstName: data.firstName,
         lastName: data.lastName,
-        role: data.role || 'EMPLOYEE',
+        role: 'EMPLOYEE',
       },
     });
 
@@ -57,35 +57,39 @@ class AuthService {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone || null,
-        role: (data.role as any) || 'EMPLOYEE',
+        role: 'EMPLOYEE',
       },
     });
 
     return user;
   }
 
-  async syncUser(authId: string, email: string, userMeta?: { firstName?: string; lastName?: string; role?: string }) {
-    let user = await prisma.user.findUnique({ where: { authId } });
+  async syncUser(userId: string, email: string, userMeta?: { firstName?: string; lastName?: string }) {
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ id: userId }, { authId: userId }] },
+    });
 
     if (!user) {
       user = await prisma.user.create({
         data: {
-          authId,
+          authId: userId,
           email,
           firstName: userMeta?.firstName || email.split('@')[0],
           lastName: userMeta?.lastName || '',
-          role: (userMeta?.role as any) || 'EMPLOYEE',
+          role: 'EMPLOYEE',
         },
       });
-    } else if (user.email !== email) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { email },
-      });
+    } else {
+      const updateData: any = {};
+      if (userMeta?.firstName) updateData.firstName = userMeta.firstName;
+      if (userMeta?.lastName) updateData.lastName = userMeta.lastName;
+      if (Object.keys(updateData).length > 0) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: updateData,
+        });
+      }
     }
-
-    // Auto-confirm email in Supabase Auth (dev mode)
-    await supabase.auth.admin.updateUserById(authId, { email_confirm: true }).catch(() => {});
 
     return user;
   }

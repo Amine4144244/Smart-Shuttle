@@ -26,6 +26,7 @@ export default function DriverTracking() {
   const [progress, setProgress] = useState(0);
   const watchIdRef = useRef<number | null>(null);
   const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastLocationSentRef = useRef<number>(0);
 
   const { data: trip, refetch } = useQuery({
     queryKey: ['driver-current-trip'],
@@ -69,10 +70,15 @@ export default function DriverTracking() {
         setCurrentHeading(heading);
         setGpsStatus('active');
 
-        await sendLocation(lat, lng, speed, heading);
+        // Throttle backend transmission to minimum 3 seconds interval
+        const now = Date.now();
+        if (now - lastLocationSentRef.current >= 3000) {
+          lastLocationSentRef.current = now;
+          await sendLocation(lat, lng, speed, heading);
+        }
       },
       () => { setGpsStatus('error'); toast.error('GPS signal lost'); },
-      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 2000 }
     );
 
     gpsIntervalRef.current = setInterval(() => {

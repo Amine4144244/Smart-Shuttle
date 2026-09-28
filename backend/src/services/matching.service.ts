@@ -165,15 +165,17 @@ export class MatchingService {
       });
     }
 
-    await prisma.activityLog.create({
-      data: {
-        action: 'SHARED_PICKUP_CREATED',
-        entity: 'SharedPickup',
-        entityId: pickup.id,
-        details: JSON.stringify({ reservationIds, avgLat, avgLng }),
-        userId: '00000000-0000-0000-0000-000000000000',
-      },
-    });
+    if (reservations.length > 0) {
+      await prisma.activityLog.create({
+        data: {
+          action: 'SHARED_PICKUP_CREATED',
+          entity: 'SharedPickup',
+          entityId: pickup.id,
+          details: JSON.stringify({ reservationIds, avgLat, avgLng }),
+          userId: reservations[0].participantId,
+        },
+      }).catch(() => {});
+    }
 
     return {
       id: pickup.id,

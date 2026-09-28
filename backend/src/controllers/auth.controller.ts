@@ -5,19 +5,21 @@ import { AppError } from '../middleware/error.middleware';
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const { email, password, firstName, lastName, phone, role } = req.body;
+      const { email, password, firstName, lastName, phone } = req.body;
       if (!email || !password || !firstName || !lastName) {
         throw new AppError('Email, password, first name, and last name are required', 400);
       }
-      const user = await authService.register({ email, password, firstName, lastName, phone, role });
+      // Public registration strictly creates EMPLOYEE role
+      const user = await authService.register({ email, password, firstName, lastName, phone });
       res.status(201).json(user);
     } catch (error) { next(error); }
   }
 
   async syncUser(req: Request, res: Response, next: NextFunction) {
     try {
-      const { authId, email, ...userMeta } = req.body;
-      const user = await authService.syncUser(authId, email, userMeta);
+      if (!req.user) throw new AppError('Not authenticated', 401);
+      const { firstName, lastName } = req.body;
+      const user = await authService.syncUser(req.user.userId, req.user.email, { firstName, lastName });
       res.json(user);
     } catch (error) { next(error); }
   }

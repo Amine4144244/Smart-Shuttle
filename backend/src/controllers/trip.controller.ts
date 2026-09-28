@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { tripService } from '../services/trip.service';
+import prisma from '../config/database';
+import { AppError } from '../middleware/error.middleware';
 
 export class TripController {
   async findAll(req: Request, res: Response, next: NextFunction) {
@@ -43,18 +45,45 @@ export class TripController {
     catch (error) { next(error); }
   }
 
+  private async verifyDriverOwnership(tripId: string, user: { userId: string; role: string }) {
+    if (user.role === 'SUPER_ADMIN' || user.role === 'ORGANIZER') return;
+    if (user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({ where: { userId: user.userId } });
+      if (!driver) throw new AppError('Driver profile not found', 404);
+      const trip = await prisma.trip.findUnique({ where: { id: tripId } });
+      if (!trip) throw new AppError('Trip not found', 404);
+      if (trip.driverId !== driver.id) {
+        throw new AppError('You are not authorized to modify another driver’s trip', 403);
+      }
+    } else {
+      throw new AppError('Insufficient permissions', 403);
+    }
+  }
+
   async startTrip(req: Request, res: Response, next: NextFunction) {
-    try { const trip = await tripService.startTrip(req.params.id); res.json(trip); }
+    try {
+      await this.verifyDriverOwnership(req.params.id, req.user!);
+      const trip = await tripService.startTrip(req.params.id);
+      res.json(trip);
+    }
     catch (error) { next(error); }
   }
 
   async completeTrip(req: Request, res: Response, next: NextFunction) {
-    try { const trip = await tripService.completeTrip(req.params.id); res.json(trip); }
+    try {
+      await this.verifyDriverOwnership(req.params.id, req.user!);
+      const trip = await tripService.completeTrip(req.params.id);
+      res.json(trip);
+    }
     catch (error) { next(error); }
   }
 
   async delayTrip(req: Request, res: Response, next: NextFunction) {
-    try { const result = await tripService.delayTrip(req.params.id, req.body.delayMinutes); res.json(result); }
+    try {
+      await this.verifyDriverOwnership(req.params.id, req.user!);
+      const result = await tripService.delayTrip(req.params.id, req.body.delayMinutes);
+      res.json(result);
+    }
     catch (error) { next(error); }
   }
 

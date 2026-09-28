@@ -141,7 +141,7 @@ export class ReservationService {
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findById(id: string) {
+  async findById(id: string, user?: { userId: string; role: string }) {
     const reservation = await prisma.reservation.findUnique({
       where: { id },
       include: {
@@ -154,6 +154,27 @@ export class ReservationService {
       },
     });
     if (!reservation) throw new AppError('Reservation not found', 404);
+
+    if (user) {
+      if (user.role === 'SUPER_ADMIN') {
+        // Full administrative access
+      } else if (user.role === 'ORGANIZER') {
+        if (reservation.event?.createdById !== user.userId) {
+          throw new AppError('Access denied', 403);
+        }
+      } else if (user.role === 'DRIVER') {
+        if (reservation.trip?.driver?.userId !== user.userId) {
+          throw new AppError('Access denied', 403);
+        }
+      } else if (user.role === 'EMPLOYEE') {
+        if (reservation.participantId !== user.userId) {
+          throw new AppError('Access denied', 403);
+        }
+      } else {
+        throw new AppError('Access denied', 403);
+      }
+    }
+
     return reservation;
   }
 
@@ -180,7 +201,7 @@ export class ReservationService {
     if (event.status === 'DRAFT') throw new AppError('Event is not published yet', 400);
 
     const existingCount = await prisma.reservation.count({
-      where: { eventId: data.eventId, participantId: data.participantId, status: { notIn: ['CANCELLED', 'NO_SHOW'] } },
+      where: { eventId: data.eventId, participantId: data.participantId, status: { notIn: ['CANCELLED', 'REJECTED', 'NO_SHOW'] } },
     });
     if (existingCount > 0) throw new AppError('You already have an active reservation for this event', 409);
 
@@ -188,30 +209,38 @@ export class ReservationService {
 
     const code = this.generateCode();
 
-    const reservation = await prisma.reservation.create({
-      data: {
-        participantId: data.participantId,
-        eventId: data.eventId,
-        pickupPointId: data.pickupPointId,
-        routeId: data.routeId,
-        date: data.date,
-        time: data.time,
-        notes: data.notes,
-        passengerCount,
-        contactPhone: data.contactPhone,
-        pickupLatitude: data.pickupLatitude,
-        pickupLongitude: data.pickupLongitude,
-        pickupAddress: data.pickupAddress,
-        pickupTime: data.pickupTime || data.time,
-        reservationCode: code,
-        qrCode: '',
-        status: 'PENDING',
-      },
-      include: {
-        participant: { select: { id: true, firstName: true, lastName: true, email: true } },
-        event: { select: { id: true, name: true, date: true } },
-      },
-    });
+    let reservation;
+    try {
+      reservation = await prisma.reservation.create({
+        data: {
+          participantId: data.participantId,
+          eventId: data.eventId,
+          pickupPointId: data.pickupPointId,
+          routeId: data.routeId,
+          date: data.date,
+          time: data.time,
+          notes: data.notes,
+          passengerCount,
+          contactPhone: data.contactPhone,
+          pickupLatitude: data.pickupLatitude,
+          pickupLongitude: data.pickupLongitude,
+          pickupAddress: data.pickupAddress,
+          pickupTime: data.pickupTime || data.time,
+          reservationCode: code,
+          qrCode: '',
+          status: 'PENDING',
+        },
+        include: {
+          participant: { select: { id: true, firstName: true, lastName: true, email: true } },
+          event: { select: { id: true, name: true, date: true } },
+        },
+      });
+    } catch (err: any) {
+      if (err.code === 'P2002') {
+        throw new AppError('You already have an active reservation for this event', 409);
+      }
+      throw err;
+    }
 
     const qrToken = this.generateQrToken(reservation);
     const reservationWithQr = await prisma.reservation.update({
@@ -345,55 +374,59 @@ export class ReservationService {
   }
 
   async joinExistingTrip(reservationId: string, tripId: string, userId: string) {
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: reservationId },
-      include: { trip: { include: { vehicle: true, reservations: true } } },
+    return prisma.$transaction(async (tx) => {
+      const reservation = await tx.reservation.findUnique({
+        where: { id: reservationId },
+        include: { trip: { include: { vehicle: true, reservations: true } } },
+      });
+      if (!reservation) throw new AppError('Reservation not found', 404);
+      if (reservation.participantId !== userId) throw new AppError('Not authorized', 403);
+      if (reservation.status !== 'PENDING' && reservation.status !== 'CONFIRMED') {
+        throw new AppError('Cannot join trip from current status', 400);
+      }
+
+      // Explicitly acquire row-level lock on the trip record in PostgreSQL
+      try {
+        await tx.$queryRaw`SELECT id FROM trips WHERE id = ${tripId}::text FOR UPDATE`;
+      } catch {
+        // Safe fallback for environments that do not support FOR UPDATE (e.g. SQLite test runners)
+      }
+
+      const trip = await tx.trip.findUnique({
+        where: { id: tripId },
+        include: { vehicle: true, reservations: { where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] } } } },
+      });
+      if (!trip) throw new AppError('Trip not found', 404);
+
+      // Exclude current reservation if it was already confirmed on this trip
+      const otherReservations = trip.reservations.filter((r) => r.id !== reservationId);
+      const occupiedSeats = otherReservations.reduce((sum, r) => sum + (r.passengerCount || 1), 0);
+      const totalCapacity = trip.vehicle?.capacity || 0;
+      const remainingSeats = totalCapacity - occupiedSeats;
+      const requestedSeats = reservation.passengerCount || 1;
+
+      if (remainingSeats < requestedSeats) {
+        throw new AppError('Not enough available seats on this trip', 400);
+      }
+
+      await tx.reservation.update({
+        where: { id: reservationId },
+        data: { tripId, status: 'CONFIRMED' },
+      });
+
+      await this.logStatusChange(reservationId, reservation.status, 'CONFIRMED', userId);
+
+      await tx.notification.create({
+        data: {
+          type: 'RESERVATION_CONFIRMATION',
+          title: 'Trip Joined Successfully',
+          message: `You've joined an existing shuttle. New remaining seats: ${remainingSeats - requestedSeats}`,
+          userId,
+        },
+      });
+
+      return { success: true, tripId, remainingSeats: remainingSeats - requestedSeats };
     });
-    if (!reservation) throw new AppError('Reservation not found', 404);
-    if (reservation.participantId !== userId) throw new AppError('Not authorized', 403);
-    if (reservation.status !== 'PENDING' && reservation.status !== 'CONFIRMED') {
-      throw new AppError('Cannot join trip from current status', 400);
-    }
-
-    const trip = await prisma.trip.findUnique({
-      where: { id: tripId },
-      include: { vehicle: true, reservations: { where: { status: { in: ['CONFIRMED', 'CHECKED_IN'] } } } },
-    });
-    if (!trip) throw new AppError('Trip not found', 404);
-
-    const occupiedSeats = trip.reservations.reduce((sum, r) => sum + (r.passengerCount || 1), 0);
-    const remainingSeats = (trip.vehicle?.capacity || 0) - occupiedSeats;
-
-    if (remainingSeats < (reservation.passengerCount || 1)) {
-      throw new AppError('Not enough available seats on this trip', 400);
-    }
-
-    await prisma.reservation.update({
-      where: { id: reservationId },
-      data: { tripId, status: 'CONFIRMED' },
-    });
-
-    await this.logStatusChange(reservationId, reservation.status, 'CONFIRMED', userId);
-
-    const event = reservation.eventId
-      ? await prisma.event.findUnique({ where: { id: reservation.eventId } })
-      : null;
-
-    await prisma.notification.create({
-      data: {
-        type: 'RESERVATION_CONFIRMATION',
-        title: 'Trip Joined Successfully',
-        message: `You've joined an existing shuttle. New remaining seats: ${remainingSeats - (reservation.passengerCount || 1)}`,
-        userId,
-      },
-    });
-
-    await matchingService.createSharedPickup(reservation.eventId, [
-      ...trip.reservations.map((r) => r.id),
-      reservationId,
-    ]);
-
-    return { success: true, tripId, remainingSeats: remainingSeats - (reservation.passengerCount || 1) };
   }
 
   async cancel(id: string, userId: string) {

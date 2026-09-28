@@ -36,10 +36,12 @@ app.use(helmet({
 app.use(compression());
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || config.allowedOrigins.some(o => origin.startsWith(o) || o === '*')) {
+    if (!origin) return callback(null, true);
+    const isAllowed = config.allowedOrigins.includes(origin) || config.allowedOrigins.includes('*');
+    if (isAllowed) {
       callback(null, true);
     } else {
-      callback(null, origin);
+      callback(new Error('Blocked by CORS policy'));
     }
   },
   credentials: true,
@@ -53,11 +55,23 @@ if (config.env === 'development') {
   app.use(morgan('dev'));
 }
 
-const globalLimiter = rateLimit({
+// Dedicated high-throughput limiter for active real-time GPS tracking
+const trackingLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1800, // Up to 2 updates/sec per driver
   standardHeaders: true,
   legacyHeaders: false,
+  message: { message: 'Tracking rate limit exceeded, please slow down' },
+});
+app.use('/api/tracking/:tripId/location', trackingLimiter);
+
+// Global limiter for standard API routes (excludes high-throughput tracking and health endpoints)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.originalUrl.includes('/tracking/') || req.originalUrl === '/api/health',
   message: { message: 'Too many requests, please try again later' },
 });
 app.use('/api', globalLimiter);

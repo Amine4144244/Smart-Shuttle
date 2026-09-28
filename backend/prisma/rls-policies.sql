@@ -26,14 +26,14 @@ CREATE OR REPLACE FUNCTION current_user_role()
 RETURNS TEXT
 LANGUAGE SQL STABLE
 AS $$
-  SELECT role::TEXT FROM "users" WHERE auth_id = auth.uid() LIMIT 1;
+  SELECT role::TEXT FROM "users" WHERE "authId" = auth.uid()::TEXT LIMIT 1;
 $$;
 
 -- ============================================================
 -- USERS
 -- ============================================================
 -- Everyone can read their own profile
-CREATE POLICY "users_select_self" ON "users" FOR SELECT USING (auth_id = auth.uid());
+CREATE POLICY "users_select_self" ON "users" FOR SELECT USING ("authId" = auth.uid()::TEXT);
 -- SUPER_ADMIN can read all
 CREATE POLICY "users_select_admin" ON "users" FOR SELECT USING (current_user_role() = 'SUPER_ADMIN');
 -- SUPER_ADMIN can insert/update/delete
@@ -41,17 +41,17 @@ CREATE POLICY "users_insert_admin" ON "users" FOR INSERT WITH CHECK (current_use
 CREATE POLICY "users_update_admin" ON "users" FOR UPDATE USING (current_user_role() = 'SUPER_ADMIN');
 CREATE POLICY "users_delete_admin" ON "users" FOR DELETE USING (current_user_role() = 'SUPER_ADMIN');
 -- Users can update their own profile (except role)
-CREATE POLICY "users_update_self" ON "users" FOR UPDATE USING (auth_id = auth.uid())
-  WITH CHECK (auth_id = auth.uid() AND role = (SELECT role FROM "users" WHERE auth_id = auth.uid()));
+CREATE POLICY "users_update_self" ON "users" FOR UPDATE USING ("authId" = auth.uid()::TEXT)
+  WITH CHECK ("authId" = auth.uid()::TEXT AND role = (SELECT role FROM "users" WHERE "authId" = auth.uid()::TEXT));
 
 -- ============================================================
 -- DRIVERS
 -- ============================================================
-CREATE POLICY "drivers_select_self" ON "drivers" FOR SELECT USING (user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid()));
+CREATE POLICY "drivers_select_self" ON "drivers" FOR SELECT USING ("userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT));
 CREATE POLICY "drivers_select_admin" ON "drivers" FOR SELECT USING (current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER'));
 CREATE POLICY "drivers_insert_admin" ON "drivers" FOR INSERT WITH CHECK (current_user_role() = 'SUPER_ADMIN');
 CREATE POLICY "drivers_update_admin" ON "drivers" FOR UPDATE USING (current_user_role() = 'SUPER_ADMIN');
-CREATE POLICY "drivers_update_self" ON "drivers" FOR UPDATE USING (user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid()));
+CREATE POLICY "drivers_update_self" ON "drivers" FOR UPDATE USING ("userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT));
 CREATE POLICY "drivers_delete_admin" ON "drivers" FOR DELETE USING (current_user_role() = 'SUPER_ADMIN');
 
 -- ============================================================
@@ -87,19 +87,19 @@ CREATE POLICY "stops_delete_admin" ON "route_stops" FOR DELETE USING (current_us
 -- PICKUP_POINTS
 -- ============================================================
 CREATE POLICY "pickup_select_all" ON "pickup_points" FOR SELECT USING (true);
-CREATE POLICY "pickup_insert_admin" ON "pickup_points" FOR INSERT WITH CHECK (current_user_role() = 'SUPER_ADMIN');
-CREATE POLICY "pickup_update_admin" ON "pickup_points" FOR UPDATE USING (current_user_role() = 'SUPER_ADMIN');
+CREATE POLICY "pickup_insert_admin" ON "pickup_points" FOR INSERT WITH CHECK (current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER'));
+CREATE POLICY "pickup_update_admin" ON "pickup_points" FOR UPDATE USING (current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER'));
 CREATE POLICY "pickup_delete_admin" ON "pickup_points" FOR DELETE USING (current_user_role() = 'SUPER_ADMIN');
 
 -- ============================================================
 -- RESERVATIONS
 -- ============================================================
 CREATE POLICY "reservations_select_self" ON "reservations" FOR SELECT USING (
-  participant_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "participantId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
   OR current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER', 'DRIVER')
 );
 CREATE POLICY "reservations_insert_self" ON "reservations" FOR INSERT WITH CHECK (
-  participant_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "participantId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
   OR current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER')
 );
 CREATE POLICY "reservations_update_admin" ON "reservations" FOR UPDATE USING (current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER', 'DRIVER'));
@@ -111,7 +111,7 @@ CREATE POLICY "reservations_delete_admin" ON "reservations" FOR DELETE USING (cu
 CREATE POLICY "trips_select_all" ON "trips" FOR SELECT USING (true);
 CREATE POLICY "trips_insert_admin" ON "trips" FOR INSERT WITH CHECK (current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER'));
 CREATE POLICY "trips_update_driver" ON "trips" FOR UPDATE USING (
-  driver_id IN (SELECT id FROM "drivers" WHERE user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid()))
+  "driverId" IN (SELECT id FROM "drivers" WHERE "userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT))
   OR current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER')
 );
 CREATE POLICY "trips_delete_admin" ON "trips" FOR DELETE USING (current_user_role() = 'SUPER_ADMIN');
@@ -120,7 +120,7 @@ CREATE POLICY "trips_delete_admin" ON "trips" FOR DELETE USING (current_user_rol
 -- TRACKING_LOGS
 -- ============================================================
 CREATE POLICY "tracking_insert_driver" ON "tracking_logs" FOR INSERT WITH CHECK (
-  trip_id IN (SELECT id FROM "trips" WHERE driver_id IN (SELECT id FROM "drivers" WHERE user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())))
+  "tripId" IN (SELECT id FROM "trips" WHERE "driverId" IN (SELECT id FROM "drivers" WHERE "userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)))
 );
 CREATE POLICY "tracking_select_all" ON "tracking_logs" FOR SELECT USING (true);
 
@@ -128,24 +128,24 @@ CREATE POLICY "tracking_select_all" ON "tracking_logs" FOR SELECT USING (true);
 -- NOTIFICATIONS
 -- ============================================================
 CREATE POLICY "notifications_select_self" ON "notifications" FOR SELECT USING (
-  user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
 );
 CREATE POLICY "notifications_update_self" ON "notifications" FOR UPDATE USING (
-  user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
 );
 CREATE POLICY "notifications_delete_self" ON "notifications" FOR DELETE USING (
-  user_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "userId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
 );
 
 -- ============================================================
 -- CHAT_MESSAGES
 -- ============================================================
 CREATE POLICY "messages_select_self" ON "chat_messages" FOR SELECT USING (
-  sender_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
-  OR receiver_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "senderId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
+  OR "receiverId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
 );
 CREATE POLICY "messages_insert_self" ON "chat_messages" FOR INSERT WITH CHECK (
-  sender_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "senderId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
 );
 
 -- ============================================================
@@ -163,11 +163,11 @@ CREATE POLICY "shared_update_admin" ON "shared_pickups" FOR UPDATE USING (curren
 CREATE POLICY "shared_delete_admin" ON "shared_pickups" FOR DELETE USING (current_user_role() = 'SUPER_ADMIN');
 
 CREATE POLICY "waiting_select_self" ON "waiting_list" FOR SELECT USING (
-  participant_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "participantId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
   OR current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER')
 );
 CREATE POLICY "waiting_insert_self" ON "waiting_list" FOR INSERT WITH CHECK (
-  participant_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid())
+  "participantId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT)
 );
 CREATE POLICY "waiting_update_admin" ON "waiting_list" FOR UPDATE USING (current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER'));
 
@@ -175,7 +175,7 @@ CREATE POLICY "waiting_update_admin" ON "waiting_list" FOR UPDATE USING (current
 -- RESERVATION STATUS HISTORY
 -- ============================================================
 CREATE POLICY "history_select_self" ON "reservation_status_history" FOR SELECT USING (
-  reservation_id IN (SELECT id FROM "reservations" WHERE participant_id IN (SELECT id FROM "users" WHERE auth_id = auth.uid()))
+  "reservationId" IN (SELECT id FROM "reservations" WHERE "participantId" IN (SELECT id FROM "users" WHERE "authId" = auth.uid()::TEXT))
   OR current_user_role() IN ('SUPER_ADMIN', 'ORGANIZER', 'DRIVER')
 );
 CREATE POLICY "history_insert_system" ON "reservation_status_history" FOR INSERT WITH CHECK (true);
@@ -189,9 +189,9 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.users (auth_id, email, first_name, last_name, role)
+  INSERT INTO public.users ("authId", email, "firstName", "lastName", role)
   VALUES (
-    NEW.id,
+    NEW.id::TEXT,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'firstName', ''),
     COALESCE(NEW.raw_user_meta_data->>'lastName', ''),

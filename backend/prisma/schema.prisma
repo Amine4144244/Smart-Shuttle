@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -241,21 +242,26 @@ model Reservation {
   participantId     String
   participant       User               @relation(fields: [participantId], references: [id], onDelete: Cascade)
   eventId           String
-  event             Event              @relation(fields: [eventId], references: [id])
+  event             Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
   pickupPointId     String?
   pickupPoint       PickupPoint?       @relation(fields: [pickupPointId], references: [id], onDelete: SetNull)
   optimizedPickupId String?
   optimizedPickup   SharedPickup?      @relation("OptimizedPickup", fields: [optimizedPickupId], references: [id], onDelete: SetNull)
   tripId            String?
-  trip              Trip?              @relation(fields: [tripId], references: [id])
+  trip              Trip?              @relation(fields: [tripId], references: [id], onDelete: SetNull)
   routeId           String?
-  route             Route?             @relation(fields: [routeId], references: [id])
+  route             Route?             @relation(fields: [routeId], references: [id], onDelete: SetNull)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 
   statusHistory     ReservationStatusHistory[]
   waitingListEntry  WaitingList?
 
+  @@index([participantId])
+  @@index([eventId])
+  @@index([tripId])
+  @@index([status])
+  @@index([date])
   @@map("reservations")
 }
 
@@ -268,7 +274,7 @@ model SharedPickup {
   eventId         String
   event           Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tripId          String?
-  trip            Trip?    @relation(fields: [tripId], references: [id])
+  trip            Trip?    @relation(fields: [tripId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
 
   reservations    Reservation[] @relation("OptimizedPickup")
@@ -281,9 +287,9 @@ model WaitingList {
   reservationId   String            @unique
   reservation     Reservation       @relation(fields: [reservationId], references: [id], onDelete: Cascade)
   eventId         String
-  event           Event             @relation(fields: [eventId], references: [id])
+  event           Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
   tripId          String?
-  trip            Trip?             @relation(fields: [tripId], references: [id])
+  trip            Trip?             @relation(fields: [tripId], references: [id], onDelete: SetNull)
   participantId   String
   participant     User              @relation(fields: [participantId], references: [id], onDelete: Cascade)
   passengerCount  Int               @default(1)
@@ -291,6 +297,9 @@ model WaitingList {
   createdAt       DateTime          @default(now())
   assignedAt      DateTime?
 
+  @@index([eventId])
+  @@index([participantId])
+  @@index([status])
   @@map("waiting_list")
 }
 
@@ -304,6 +313,7 @@ model ReservationStatusHistory {
   changedBy     User?            @relation(fields: [changedById], references: [id], onDelete: SetNull)
   createdAt     DateTime         @default(now())
 
+  @@index([reservationId])
   @@map("reservation_status_history")
 }
 
@@ -325,7 +335,7 @@ model Trip {
   vehicleId       String
   vehicle         Vehicle    @relation(fields: [vehicleId], references: [id])
   routeId         String
-  route           Route      @relation(fields: [routeId], references: [id])
+  route           Route      @relation(fields: [routeId], references: [id], onDelete: Cascade)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -334,6 +344,10 @@ model Trip {
   sharedPickups   SharedPickup[]
   waitingList     WaitingList[]
 
+  @@index([driverId])
+  @@index([routeId])
+  @@index([status])
+  @@index([date])
   @@map("trips")
 }
 
@@ -347,6 +361,7 @@ model TrackingLog {
   tripId    String
   trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
 
+  @@index([tripId, timestamp])
   @@map("tracking_logs")
 }
 
@@ -360,6 +375,7 @@ model Notification {
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime         @default(now())
 
+  @@index([userId, read])
   @@map("notifications")
 }
 

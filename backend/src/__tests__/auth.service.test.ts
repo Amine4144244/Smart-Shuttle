@@ -37,14 +37,14 @@ describe('AuthService', () => {
 
   describe('syncUser', () => {
     it('should create a new user if not exists', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.user.create as jest.Mock).mockResolvedValue({
         id: '1', authId: 'auth-123', email: 'test@test.com',
         firstName: 'John', lastName: 'Doe', role: 'EMPLOYEE',
       });
 
       const result = await authService.syncUser('auth-123', 'test@test.com', {
-        firstName: 'John', lastName: 'Doe', role: 'EMPLOYEE',
+        firstName: 'John', lastName: 'Doe',
       });
 
       expect(prisma.user.create).toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe('AuthService', () => {
     });
 
     it('should return existing user', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue({
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue({
         id: '1', authId: 'auth-123', email: 'test@test.com',
         firstName: 'John', lastName: 'Doe', role: 'EMPLOYEE',
       });

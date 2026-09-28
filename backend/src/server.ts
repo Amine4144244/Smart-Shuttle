@@ -22,7 +22,16 @@ ${missing.map(v => `  ║    - ${v.key}${' '.repeat(56 - v.key.length)}║`).joi
   process.exit(1);
 }
 
-if (config.qrSecret === 'qr-secret-change-in-production') {
+if (config.env === 'production' && (!config.qrSecret || config.qrSecret === 'qr-secret-change-in-production')) {
+  console.error(`
+  ╔══════════════════════════════════════════════════════════╗
+  ║  CRITICAL ERROR: QR_SECRET must be set to a secure       ║
+  ║  random secret in production environment!                ║
+  ║  Refusing to start server.                               ║
+  ╚══════════════════════════════════════════════════════════╝
+  `);
+  process.exit(1);
+} else if (config.qrSecret === 'qr-secret-change-in-production') {
   console.warn(`
   ╔══════════════════════════════════════════════════════════╗
   ║  WARNING: QR_SECRET is still set to the default value!  ║

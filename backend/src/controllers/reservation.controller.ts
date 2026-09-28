@@ -10,7 +10,10 @@ export class ReservationController {
   }
 
   async findById(req: Request, res: Response, next: NextFunction) {
-    try { const reservation = await reservationService.findById(req.params.id); res.json(reservation); }
+    try {
+      const reservation = await reservationService.findById(req.params.id, req.user!);
+      res.json(reservation);
+    }
     catch (error) { next(error); }
   }
 
