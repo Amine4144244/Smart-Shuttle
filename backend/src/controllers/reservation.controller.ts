@@ -20,10 +20,39 @@ export class ReservationController {
   async create(req: Request, res: Response, next: NextFunction) {
     try {
       const data = { ...req.body, participantId: req.user!.userId };
-      if (typeof data.date === 'string') data.date = new Date(data.date);
-      if (data.date && typeof data.time === 'string') {
-        data.time = new Date(`${data.date.toISOString().split('T')[0]}T${data.time}:00`);
+
+      // Normalize coordinates
+      if (data.pickupLat !== undefined && data.pickupLatitude === undefined) {
+        data.pickupLatitude = Number(data.pickupLat);
       }
+      if (data.pickupLng !== undefined && data.pickupLongitude === undefined) {
+        data.pickupLongitude = Number(data.pickupLng);
+      }
+      if (typeof data.passengerCount === 'string') {
+        data.passengerCount = parseInt(data.passengerCount, 10);
+      }
+
+      // Safe date normalization
+      const dateStr = typeof data.date === 'string'
+        ? data.date.slice(0, 10)
+        : (data.date instanceof Date ? data.date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+      data.date = new Date(`${dateStr}T00:00:00.000Z`);
+
+      // Safe time normalization
+      const rawTime = typeof data.time === 'string'
+        ? data.time
+        : (data.time instanceof Date ? data.time.toTimeString().slice(0, 5) : '08:30');
+      const timeClean = rawTime.length === 5 ? `${rawTime}:00` : rawTime.slice(0, 8);
+      data.time = new Date(`${dateStr}T${timeClean}Z`);
+
+      // Safe pickupTime normalization as a Date object
+      if (data.pickupTime) {
+        const pt = new Date(data.pickupTime);
+        data.pickupTime = isNaN(pt.getTime()) ? data.time : pt;
+      } else {
+        data.pickupTime = data.time;
+      }
+
       const reservation = await reservationService.create(data);
       res.status(201).json(reservation);
     } catch (error) { next(error); }

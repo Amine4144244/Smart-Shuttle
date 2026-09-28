@@ -198,6 +198,8 @@ export default function ParticipantBookings() {
     bookMutation.mutate({
       eventId: selectedEvent,
       pickupPointId: selectedPickupPointId || undefined,
+      pickupLatitude: Number(pickupLat),
+      pickupLongitude: Number(pickupLng),
       pickupLat: Number(pickupLat),
       pickupLng: Number(pickupLng),
       pickupAddress: pickupAddress || 'Custom GPS Pickup Location',

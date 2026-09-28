@@ -182,7 +182,6 @@ export class ReservationService {
     participantId: string;
     eventId: string;
     pickupPointId?: string;
-    tripId?: string;
     date: Date;
     time: Date;
     routeId?: string;
@@ -217,17 +216,16 @@ export class ReservationService {
           participantId: data.participantId,
           eventId: data.eventId,
           pickupPointId: data.pickupPointId,
-          tripId: data.tripId,
           routeId: data.routeId,
-          date: data.date,
-          time: data.time,
+          date: data.date instanceof Date ? data.date : new Date(data.date),
+          time: data.time instanceof Date ? data.time : new Date(data.time),
           notes: data.notes,
           passengerCount,
           contactPhone: data.contactPhone,
-          pickupLatitude: data.pickupLatitude,
-          pickupLongitude: data.pickupLongitude,
+          pickupLatitude: data.pickupLatitude ?? (data as any).pickupLat,
+          pickupLongitude: data.pickupLongitude ?? (data as any).pickupLng,
           pickupAddress: data.pickupAddress,
-          pickupTime: data.pickupTime || data.time,
+          pickupTime: data.pickupTime instanceof Date ? data.pickupTime : (data.pickupTime ? new Date(data.pickupTime) : (data.time instanceof Date ? data.time : new Date(data.time))),
           reservationCode: code,
           qrCode: '',
           status: 'PENDING',
