@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { eventsApi, reservationsApi, pickupPointsApi, tripsApi } from '@/services/api';
@@ -38,7 +38,8 @@ export default function ParticipantBookings() {
   const [pickupLat, setPickupLat] = useState<number | null>(null);
   const [pickupLng, setPickupLng] = useState<number | null>(null);
   const [pickupAddress, setPickupAddress] = useState('');
-  const [pickupTime, setPickupTime] = useState('');
+  const [pickupDate, setPickupDate] = useState('');
+  const [pickupDepartureTime, setPickupDepartureTime] = useState('08:30');
   const [matches, setMatches] = useState<any[]>([]);
   const [showMatches, setShowMatches] = useState(false);
   const [searching, setSearching] = useState('');
@@ -47,11 +48,6 @@ export default function ParticipantBookings() {
   const { data: events, isLoading: isEventsLoading } = useQuery({
     queryKey: ['events-list'],
     queryFn: () => eventsApi.getAll({ limit: 50 }).then((r) => r.data),
-  });
-
-  const { data: eventTripsData } = useQuery({
-    queryKey: ['trips-list-booking'],
-    queryFn: () => tripsApi.getAll({ limit: 100 }).then((r) => r.data),
   });
 
   const { data: myReservations } = useQuery({
@@ -66,9 +62,17 @@ export default function ParticipantBookings() {
     enabled: !!selectedEvent,
   });
 
-  const eventTrips = (eventTripsData?.data || []).filter(
-    (t: any) => t.route?.eventId === selectedEvent
-  );
+  const { data: eventTripsData } = useQuery({
+    queryKey: ['trips-event', selectedEvent],
+    queryFn: () => tripsApi.getAll({ limit: 100 }).then((r) => r.data),
+    enabled: !!selectedEvent,
+  });
+
+  const eventTrips = useMemo(() => {
+    return (eventTripsData?.data || []).filter(
+      (t: any) => t.route?.eventId === selectedEvent || t.eventId === selectedEvent
+    );
+  }, [eventTripsData, selectedEvent]);
 
   const bookedEventIds = new Set(
     (Array.isArray(myReservations) ? myReservations : [])
@@ -77,6 +81,27 @@ export default function ParticipantBookings() {
   );
 
   const selectedEventObj = events?.data?.find((e: any) => e.id === selectedEvent);
+
+  // Sync fixed departure date when trips or selectedEvent changes
+  useEffect(() => {
+    if (selectedEventObj) {
+      const scheduledDate = eventTrips[0]?.date
+        ? eventTrips[0].date.split('T')[0]
+        : (selectedEventObj.date ? selectedEventObj.date.split('T')[0] : '');
+      if (scheduledDate) {
+        setPickupDate(scheduledDate);
+      }
+      if (eventTrips.length > 0 && eventTrips[0]?.departureTime) {
+        setPickupDepartureTime(eventTrips[0].departureTime.slice(0, 5));
+      }
+    }
+  }, [selectedEventObj, eventTrips]);
+
+  const availableDepartureTimes = useMemo(() => {
+    return Array.from(
+      new Set(eventTrips.map((t: any) => t.departureTime?.slice(0, 5)).filter(Boolean))
+    ).sort() as string[];
+  }, [eventTrips]);
 
   const bookMutation = useMutation({
     mutationFn: (data: any) => reservationsApi.create(data),
@@ -105,7 +130,7 @@ export default function ParticipantBookings() {
 
   const handleMatching = useCallback(
     async (reservation: any) => {
-      if (!pickupLat || !pickupLng || !pickupTime) {
+      if (!pickupLat || !pickupLng || !pickupDate || !pickupDepartureTime) {
         navigate('/participant/tickets');
         return;
       }
@@ -115,7 +140,7 @@ export default function ParticipantBookings() {
           eventId: selectedEvent,
           lat: pickupLat,
           lng: pickupLng,
-          pickupTime,
+          pickupTime: `${pickupDate}T${pickupDepartureTime}`,
           passengerCount,
           excludeReservationId: reservation?.id,
         });
@@ -136,7 +161,7 @@ export default function ParticipantBookings() {
         navigate('/participant/tickets');
       }
     },
-    [pickupLat, pickupLng, pickupTime, passengerCount, selectedEvent, navigate]
+    [pickupLat, pickupLng, pickupDate, pickupDepartureTime, passengerCount, selectedEvent, navigate]
   );
 
   const handleBook = async () => {
@@ -148,14 +173,14 @@ export default function ParticipantBookings() {
       toast.error('Please select an official station or detect your GPS location');
       return;
     }
-    if (!pickupTime) {
-      toast.error('Please select your preferred pickup time');
+    if (!pickupDate || !pickupDepartureTime) {
+      toast.error('Please select your preferred pickup schedule');
       return;
     }
 
-    // Direct exact string parsing to prevent any timezone shifts
-    const [dateStr, timeStrRaw] = pickupTime.split('T');
-    const timeStr = (timeStrRaw || '08:30').slice(0, 5);
+    const dateStr = pickupDate;
+    const timeStr = pickupDepartureTime;
+    const combinedIso = `${dateStr}T${timeStr}`;
 
     bookMutation.mutate({
       eventId: selectedEvent,
@@ -163,7 +188,7 @@ export default function ParticipantBookings() {
       pickupLat: Number(pickupLat),
       pickupLng: Number(pickupLng),
       pickupAddress: pickupAddress || 'Custom GPS Pickup Location',
-      pickupTime,
+      pickupTime: combinedIso,
       date: dateStr,
       time: timeStr,
       passengerCount: Number(passengerCount),
@@ -184,7 +209,8 @@ export default function ParticipantBookings() {
     setPickupLat(null);
     setPickupLng(null);
     setPickupAddress('');
-    setPickupTime('');
+    setPickupDate('');
+    setPickupDepartureTime('08:30');
     setNotes('');
     setMatches([]);
     setShowMatches(false);
@@ -196,26 +222,12 @@ export default function ParticipantBookings() {
       return;
     }
     setSelectedEvent(event.id);
-
-    // Look for any trips scheduled for this event
-    const tripsForThisEvent = (eventTripsData?.data || []).filter(
-      (t: any) => t.route?.eventId === event.id
-    );
-
-    let defaultDate = event.date ? event.date.split('T')[0] : new Date().toISOString().split('T')[0];
-    let defaultTime = event.startTime ? event.startTime.slice(0, 5) : '08:30';
-
-    if (tripsForThisEvent.length > 0) {
-      const firstTrip = tripsForThisEvent[0];
-      if (firstTrip.date) {
-        defaultDate = firstTrip.date.split('T')[0];
-      }
-      if (firstTrip.departureTime) {
-        defaultTime = firstTrip.departureTime.slice(0, 5);
-      }
-    }
-
-    setPickupTime(`${defaultDate}T${defaultTime}`);
+    const datePart = event.date
+      ? (typeof event.date === 'string' ? event.date.split('T')[0] : new Date(event.date).toISOString().split('T')[0])
+      : '';
+    const timePart = event.startTime ? event.startTime.slice(0, 5) : '08:30';
+    setPickupDate(datePart);
+    setPickupDepartureTime(timePart);
     setStep('select-pickup');
   };
 
@@ -574,68 +586,72 @@ export default function ParticipantBookings() {
                   </div>
                 </div>
 
-                {/* Available Scheduled Shuttles */}
-                {eventTrips.length > 0 && (
-                  <div className="space-y-2 pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
-                        Navettes Programmées ({eventTrips.length})
-                      </label>
-                      <span className="text-[10px] text-[#ffac00] font-bold">Sélection en 1 clic</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
-                      {eventTrips.map((t: any) => {
-                        const tripDatePart = t.date ? t.date.split('T')[0] : '';
-                        const tripTimePart = t.departureTime ? t.departureTime.slice(0, 5) : '08:30';
-                        const fullTripDateTime = `${tripDatePart}T${tripTimePart}`;
-                        const isSelected = pickupTime === fullTripDateTime;
-                        return (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => setPickupTime(fullTripDateTime)}
-                            className={`p-2.5 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                              isSelected
-                                ? 'border-[#ffac00] bg-[#ffac00]/15 text-neutral-950 dark:text-white font-bold ring-2 ring-[#ffac00] shadow-xs'
-                                : 'border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/40 hover:border-neutral-300 text-neutral-700 dark:text-neutral-300'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-1">
-                              <span className="font-mono font-extrabold text-xs text-neutral-950 dark:text-white flex items-center gap-1">
-                                <Clock className="h-3 w-3 text-[#ffac00]" /> {tripTimePart}
-                              </span>
-                              <span className="text-[10px] font-mono text-neutral-500 font-bold">
-                                {tripDatePart}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-neutral-400 truncate mt-0.5">
-                              {t.route?.name || t.vehicle?.busNumber || 'Navette Directe'}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Pickup DateTime */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
-                      Pickup Schedule (Date & Heure de circulation)
-                    </label>
-                    {selectedEventObj?.date && (
-                      <span className="text-[10px] text-neutral-400 font-mono">
-                        Événement: {selectedEventObj.date.split('T')[0]}
+                {/* Pickup Schedule (Fixed Date & Departure Time) */}
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-[#ffac00]" />
+                        Date de Circulation de la Navette
                       </span>
-                    )}
+                      <span className="text-[9px] sm:text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                        Fixée pour cet événement
+                      </span>
+                    </label>
+                    <div className="p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/80 dark:bg-neutral-900/90 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-[#ffac00]" />
+                        <span className="font-bold text-neutral-950 dark:text-white text-xs sm:text-sm">
+                          {pickupDate ? formatDate(pickupDate) : 'Date événement'}
+                        </span>
+                      </div>
+                      <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400 bg-white dark:bg-neutral-800 px-2.5 py-1 rounded-xl border border-neutral-200 dark:border-neutral-700 font-bold">
+                        {pickupDate}
+                      </span>
+                    </div>
                   </div>
-                  <input
-                    type="datetime-local"
-                    value={pickupTime}
-                    onChange={(e) => setPickupTime(e.target.value)}
-                    className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2.5 text-xs font-mono text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
-                  />
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                      Heure de Départ de la Navette
+                    </label>
+
+                    {/* Pre-programmed Departure Slots if available */}
+                    {availableDepartureTimes.length > 0 && (
+                      <div className="space-y-1.5 p-2.5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/70 dark:border-neutral-800">
+                        <p className="text-[10px] font-semibold text-neutral-400 flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-[#ffac00]" />
+                          Créneaux programmés ({availableDepartureTimes.length}) :
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableDepartureTimes.map((timeStr: string) => {
+                            const isSelected = pickupDepartureTime === timeStr;
+                            return (
+                              <button
+                                key={timeStr}
+                                type="button"
+                                onClick={() => setPickupDepartureTime(timeStr)}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold transition-all border ${
+                                  isSelected
+                                    ? 'bg-[#ffac00] text-neutral-950 border-[#ffac00] shadow-xs scale-105'
+                                    : 'bg-white dark:bg-neutral-800 border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:border-neutral-400'
+                                }`}
+                              >
+                                {timeStr}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <input
+                      type="time"
+                      value={pickupDepartureTime}
+                      onChange={(e) => setPickupDepartureTime(e.target.value)}
+                      className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2.5 text-xs font-mono font-bold text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                    />
+                  </div>
                 </div>
 
                 {/* Contact Phone */}
