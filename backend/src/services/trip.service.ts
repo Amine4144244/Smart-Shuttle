@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
+import { emitToTrip, emitToUser } from './socket.service';
 
 export class TripService {
   async findAll(params: { page?: number; limit?: number; status?: string; driverId?: string; routeId?: string; date?: string }) {
@@ -71,9 +72,24 @@ export class TripService {
   async startTrip(id: string) {
     const trip = await prisma.trip.update({
       where: { id },
-      data: { status: 'IN_PROGRESS' },
+      data: { status: 'IN_PROGRESS', tripProgress: 0 },
+      include: {
+        driver: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } },
+        vehicle: true,
+        route: { include: { stops: { orderBy: { order: 'asc' } }, event: { select: { id: true, name: true, date: true } } } },
+        reservations: { include: { participant: { select: { id: true, firstName: true, lastName: true, email: true } }, pickupPoint: true } },
+      },
     });
-    await this.notifyPassengers(id, 'TRIP_STARTED', 'Trip Started', 'Your trip has started.');
+
+    if (trip.vehicleId) {
+      await prisma.vehicle.update({
+        where: { id: trip.vehicleId },
+        data: { status: 'IN_USE' },
+      }).catch(() => {});
+    }
+
+    await this.notifyPassengers(id, 'TRIP_STARTED', 'Trip Started', 'Your shuttle is now in transit.');
+    emitToTrip(id, 'trip-status-changed', { tripId: id, status: 'IN_PROGRESS', label: 'In Transit' });
     return trip;
   }
 
@@ -81,8 +97,24 @@ export class TripService {
     const trip = await prisma.trip.update({
       where: { id },
       data: { status: 'COMPLETED', arrivalTime: new Date(), tripProgress: 100 },
+      include: {
+        driver: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } },
+        vehicle: true,
+        route: { include: { stops: { orderBy: { order: 'asc' } }, event: { select: { id: true, name: true, date: true } } } },
+        reservations: { include: { participant: { select: { id: true, firstName: true, lastName: true, email: true } }, pickupPoint: true } },
+      },
     });
-    await prisma.reservation.updateMany({ where: { tripId: id }, data: { status: 'COMPLETED' } });
+
+    if (trip.vehicleId) {
+      await prisma.vehicle.update({
+        where: { id: trip.vehicleId },
+        data: { status: 'AVAILABLE' },
+      }).catch(() => {});
+    }
+
+    await prisma.reservation.updateMany({ where: { tripId: id }, data: { status: 'COMPLETED' } }).catch(() => {});
+    await this.notifyPassengers(id, 'TRIP_ARRIVED', 'Trip Completed', 'Your shuttle has arrived at the destination.');
+    emitToTrip(id, 'trip-status-changed', { tripId: id, status: 'COMPLETED', label: 'Arrived' });
     return trip;
   }
 
@@ -100,15 +132,35 @@ export class TripService {
     });
 
     await this.notifyPassengers(id, 'TRIP_DELAYED', 'Trip Delayed', `Your trip is delayed by approximately ${delayMinutes} minutes.`);
+    emitToTrip(id, 'trip-status-changed', { tripId: id, status: 'DELAYED', label: 'Delayed' });
     return { id, newEstimatedArrival };
   }
 
   private async notifyPassengers(tripId: string, type: any, title: string, message: string) {
-    const reservations = await prisma.reservation.findMany({
-      where: { tripId, status: { in: ['CONFIRMED', 'CHECKED_IN'] } },
-    });
-    for (const r of reservations) {
-      await prisma.notification.create({ data: { type, title, message, userId: r.participantId } });
+    try {
+      const trip = await prisma.trip.findUnique({
+        where: { id: tripId },
+        include: { route: true },
+      });
+      const eventId = trip?.route?.eventId;
+
+      const reservations = await prisma.reservation.findMany({
+        where: {
+          OR: [
+            { tripId },
+            ...(eventId ? [{ eventId, status: { in: ['CONFIRMED' as const, 'CHECKED_IN' as const, 'PENDING' as const] } }] : []),
+          ],
+        },
+      });
+
+      for (const r of reservations) {
+        await prisma.notification.create({
+          data: { type, title, message, userId: r.participantId },
+        }).catch(() => {});
+        emitToUser(r.participantId, 'notification', { type, title, message, tripId });
+      }
+    } catch {
+      // non-critical failure
     }
   }
 
