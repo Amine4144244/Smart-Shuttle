@@ -46,10 +46,23 @@ export class TripService {
   }
 
   async create(data: any) {
-    return prisma.trip.create({
+    const trip = await prisma.trip.create({
       data,
       include: { driver: true, vehicle: true, route: true },
     });
+
+    if (trip.route?.eventId) {
+      await prisma.reservation.updateMany({
+        where: {
+          eventId: trip.route.eventId,
+          tripId: null,
+          status: { in: ['CONFIRMED', 'PENDING', 'CHECKED_IN'] },
+        },
+        data: { tripId: trip.id },
+      });
+    }
+
+    return trip;
   }
 
   async update(id: string, data: any) {

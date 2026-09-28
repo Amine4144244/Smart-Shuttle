@@ -69,97 +69,125 @@ export default function DriverTrips() {
       ) : (
         <div className="space-y-4">
           {data.data.map((trip: any) => {
-          const isExpanded = expandedTrip === trip.id;
-          return (
-            <Card key={trip.id}>
-              <CardContent className="p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-semibold">{trip.name || `Trip #${trip.id.slice(0, 8)}`}</h3>
-                      <Badge className={getStatusColor(trip.status)}>{trip.status ? trip.status.replace('_', ' ') : ''}</Badge>
+            const isExpanded = expandedTrip === trip.id;
+            const passengerCount = trip._count?.reservations ?? 0;
+            return (
+              <Card key={trip.id} className="overflow-hidden border-border/60 hover:shadow-md transition-all">
+                <CardContent className="p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-semibold">{trip.name || `Trip #${trip.id.slice(0, 8)}`}</h3>
+                        <Badge className={getStatusColor(trip.status)}>{trip.status ? trip.status.replace('_', ' ') : ''}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{trip.route?.name} — {trip.route?.origin} → {trip.route?.destination}</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        <span>Date: <strong className="text-foreground">{formatDate(trip.date)}</strong></span>
+                        <span>Departure: <strong className="text-foreground">{formatTime(trip.departureTime)}</strong></span>
+                        <span>Vehicle: <strong className="text-foreground">{trip.vehicle?.busNumber}</strong></span>
+                        <span>Capacity: <strong className="text-foreground">{trip.vehicle?.capacity || 0}</strong></span>
+                        <span>Passengers: <strong className="text-primary font-bold">{passengerCount}</strong></span>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">{trip.route?.name} — {trip.route?.origin} → {trip.route?.destination}</p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                      <span>Date: {formatDate(trip.date)}</span>
-                      <span>Departure: {formatTime(trip.departureTime)}</span>
-                      <span>Vehicle: {trip.vehicle?.busNumber}</span>
-                      <span>Capacity: {trip.vehicle?.capacity || 0}</span>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    {trip.status === 'IN_PROGRESS' && (
-                      <Button size="sm" variant="outline" onClick={() => setExpandedTrip(isExpanded ? null : trip.id)}>
-                        <Users className="mr-1 h-4 w-4" /> Passengers {isExpanded ? <ChevronUp className="ml-1 h-3 w-3" /> : <ChevronDown className="ml-1 h-3 w-3" />}
+                    <div className="flex shrink-0 gap-2 flex-wrap items-center">
+                      <Button
+                        size="sm"
+                        variant={isExpanded ? 'secondary' : 'outline'}
+                        onClick={() => setExpandedTrip(isExpanded ? null : trip.id)}
+                      >
+                        <Users className="mr-1.5 h-4 w-4" />
+                        Passengers ({passengerCount})
+                        {isExpanded ? <ChevronUp className="ml-1.5 h-3.5 w-3.5" /> : <ChevronDown className="ml-1.5 h-3.5 w-3.5" />}
                       </Button>
-                    )}
-                    {trip.status === 'SCHEDULED' && (
-                      <Button size="sm" onClick={() => handleStartTrip(trip.id)}><Play className="mr-1 h-4 w-4" /> Start</Button>
-                    )}
-                    {trip.status === 'IN_PROGRESS' && (
-                      <Button size="sm" variant="secondary" onClick={() => handleCompleteTrip(trip.id)}><CheckCircle2 className="mr-1 h-4 w-4" /> Complete</Button>
-                    )}
-                  </div>
-                </div>
 
-                {isExpanded && (
-                  <div className="mt-4 border-t pt-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Search className="h-4 w-4 text-muted-foreground" />
-                      <Input placeholder="Search by name or code..." value={passengerSearch}
-                        onChange={(e) => setPassengerSearch(e.target.value)} className="max-w-xs h-8 text-sm" />
+                      {trip.status === 'SCHEDULED' && (
+                        <Button size="sm" onClick={() => handleStartTrip(trip.id)}>
+                          <Play className="mr-1 h-4 w-4" /> Start Trip
+                        </Button>
+                      )}
+                      {trip.status === 'IN_PROGRESS' && (
+                        <Button size="sm" variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleCompleteTrip(trip.id)}>
+                          <CheckCircle2 className="mr-1 h-4 w-4" /> Complete Trip
+                        </Button>
+                      )}
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b text-left text-muted-foreground">
-                            <th className="pb-2 font-medium">Participant</th>
-                            <th className="pb-2 font-medium">Code</th>
-                            <th className="pb-2 font-medium">Status</th>
-                            <th className="pb-2 font-medium">Boarding</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredPassengers.map((r: any) => (
-                            <tr key={r.id} className="border-b last:border-0">
-                              <td className="py-2.5">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                                    {r.participant?.firstName?.[0]}{r.participant?.lastName?.[0]}
-                                  </div>
-                                  <div>
-                                    <p className="font-medium">{r.participant?.firstName} {r.participant?.lastName}</p>
-                                    <p className="text-xs text-muted-foreground">{r.participant?.email}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-2.5 font-mono text-xs">{r.reservationCode}</td>
-                              <td className="py-2.5"><Badge className={getStatusColor(r.status)}>{r.status}</Badge></td>
-                              <td className="py-2.5">
-                                {r.status === 'CHECKED_IN' ? (
-                                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Boarded</Badge>
-                                ) : r.status === 'CONFIRMED' ? (
-                                  <Badge variant="outline" className="text-yellow-600 border-yellow-600">Waiting</Badge>
-                                ) : (
-                                  <Badge variant="outline">{r.status}</Badge>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                          {filteredPassengers.length === 0 && (
-                            <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No passengers found</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">{filteredPassengers.length} passenger(s)</p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 border-t pt-4 space-y-3">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search passenger by name or code..."
+                            value={passengerSearch}
+                            onChange={(e) => setPassengerSearch(e.target.value)}
+                            className="max-w-xs h-8 text-sm"
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Showing {filteredPassengers.length} of {reservations?.data?.length || 0} booked passenger(s)
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto rounded-xl border">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50">
+                            <tr className="border-b text-left text-xs font-semibold uppercase text-muted-foreground">
+                              <th className="py-2.5 px-3">Participant</th>
+                              <th className="py-2.5 px-3">Pickup Location</th>
+                              <th className="py-2.5 px-3">Code</th>
+                              <th className="py-2.5 px-3">Status</th>
+                              <th className="py-2.5 px-3">Boarding</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {filteredPassengers.map((r: any) => (
+                              <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                                      {r.participant?.firstName?.[0]}{r.participant?.lastName?.[0]}
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-foreground">{r.participant?.firstName} {r.participant?.lastName}</p>
+                                      <p className="text-xs text-muted-foreground">{r.participant?.phone || r.participant?.email}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3 text-xs text-muted-foreground font-medium">
+                                  {r.pickupPoint?.name || r.pickupAddress || 'Assigned Station'}
+                                </td>
+                                <td className="py-2.5 px-3 font-mono text-xs font-semibold text-foreground">{r.reservationCode}</td>
+                                <td className="py-2.5 px-3"><Badge className={getStatusColor(r.status)}>{r.status}</Badge></td>
+                                <td className="py-2.5 px-3">
+                                  {r.status === 'CHECKED_IN' ? (
+                                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">Boarded</Badge>
+                                  ) : r.status === 'CONFIRMED' ? (
+                                    <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10">Waiting</Badge>
+                                  ) : (
+                                    <Badge variant="outline">{r.status}</Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                            {filteredPassengers.length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="py-8 text-center text-muted-foreground text-xs">
+                                  No passengers found for this trip.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
     </div>
   );

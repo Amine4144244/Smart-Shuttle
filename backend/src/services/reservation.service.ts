@@ -144,13 +144,32 @@ export class ReservationService {
     if (params.status) where.status = params.status;
     if (params.eventId) where.eventId = params.eventId;
     if (params.participantId) where.participantId = params.participantId;
-    if (params.tripId) where.tripId = params.tripId;
+    if (params.tripId) {
+      const trip = await prisma.trip.findUnique({
+        where: { id: params.tripId },
+        include: { route: true },
+      });
+      if (trip && trip.route?.eventId) {
+        where.OR = [
+          { tripId: params.tripId },
+          { eventId: trip.route.eventId, tripId: null },
+        ];
+      } else {
+        where.tripId = params.tripId;
+      }
+    }
     if (params.search) {
-      where.OR = [
+      const searchConditions = [
         { reservationCode: { contains: params.search, mode: 'insensitive' } },
         { participant: { firstName: { contains: params.search, mode: 'insensitive' } } },
         { participant: { lastName: { contains: params.search, mode: 'insensitive' } } },
       ];
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
     }
 
     const [data, total] = await Promise.all([
@@ -158,7 +177,7 @@ export class ReservationService {
         where, skip, take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          participant: { select: { id: true, firstName: true, lastName: true, email: true } },
+          participant: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
           event: { select: { id: true, name: true, date: true } },
           pickupPoint: { select: { id: true, name: true } },
           optimizedPickup: { select: { id: true, name: true, latitude: true, longitude: true } },
@@ -214,6 +233,7 @@ export class ReservationService {
     date: Date;
     time: Date;
     routeId?: string;
+    tripId?: string;
     notes?: string;
     passengerCount?: number;
     contactPhone?: string;
@@ -236,6 +256,20 @@ export class ReservationService {
 
     const passengerCount = data.passengerCount || 1;
 
+    let assignedTripId = data.tripId;
+    if (!assignedTripId && data.eventId) {
+      const existingTrip = await prisma.trip.findFirst({
+        where: {
+          route: { eventId: data.eventId },
+          status: { in: ['SCHEDULED', 'IN_PROGRESS', 'PENDING'] },
+        },
+        orderBy: { departureTime: 'asc' },
+      });
+      if (existingTrip) {
+        assignedTripId = existingTrip.id;
+      }
+    }
+
     const code = this.generateCode();
 
     let reservation;
@@ -246,6 +280,7 @@ export class ReservationService {
           eventId: data.eventId,
           pickupPointId: data.pickupPointId,
           routeId: data.routeId,
+          tripId: assignedTripId || undefined,
           date: toValidDate(data.date),
           time: toValidDate(data.time),
           notes: data.notes,
