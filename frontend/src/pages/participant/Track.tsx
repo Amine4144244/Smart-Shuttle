@@ -146,23 +146,37 @@ export default function ParticipantTrack() {
     enabled: !tripId || !trip,
   });
 
-  const { data: myReservations } = useQuery({
+  const { data: myReservations, isLoading: isReservationsLoading } = useQuery({
     queryKey: ['my-reservations-track'],
     queryFn: () => reservationsApi.getMyReservations().then((r) => r.data),
-    enabled: !tripId || !trip,
   });
+
+  // Calculate active valid reservations and corresponding booked event/trip IDs
+  const validReservations = (Array.isArray(myReservations) ? myReservations : []).filter(
+    (r: any) => !['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(r.status)
+  );
+
+  const bookedEventIds = new Set(
+    validReservations.map((r: any) => r.event?.id || r.eventId).filter(Boolean)
+  );
+
+  const bookedTripIds = new Set(
+    validReservations.map((r: any) => r.trip?.id || r.tripId).filter(Boolean)
+  );
+
+  const hasBookedEvents = bookedEventIds.size > 0 || bookedTripIds.size > 0;
 
   // If no tripId in URL, but user has an active reservation with a trip, auto-navigate to it
   useEffect(() => {
-    if (!tripId && Array.isArray(myReservations)) {
-      const activeRes = myReservations.find(
+    if (!tripId && validReservations.length > 0) {
+      const activeRes = validReservations.find(
         (r: any) => r.trip?.id && ['CONFIRMED', 'CHECKED_IN', 'BOARDED'].includes(r.status)
       );
       if (activeRes?.trip?.id) {
         navigate(`/participant/track/${activeRes.trip.id}`, { replace: true });
       }
     }
-  }, [tripId, myReservations, navigate]);
+  }, [tripId, validReservations, navigate]);
 
   const originPoint = trip?.route
     ? {
@@ -185,7 +199,7 @@ export default function ParticipantTrack() {
   stopPoints.forEach((s) => routePoints.push([s.lat, s.lng]));
   if (destPoint) routePoints.push([destPoint.lat, destPoint.lng]);
 
-  if (isLoading || (isActiveTripsLoading && !tripId)) {
+  if (isLoading || ((isActiveTripsLoading || isReservationsLoading) && !tripId)) {
     return (
       <div className="flex h-[50vh] sm:h-[60vh] flex-col items-center justify-center gap-3 sm:gap-4 px-4 text-center">
         <div className="relative flex items-center justify-center">
@@ -204,9 +218,15 @@ export default function ParticipantTrack() {
     );
   }
 
-  // If no trip is loaded or selected: Fleet Selection View
+  // If no trip is loaded or selected: Fleet Selection View (Filtered strictly to booked events)
   if (!trip) {
-    const activeList = Array.isArray(activeTrips) ? activeTrips : [];
+    const activeList = (Array.isArray(activeTrips) ? activeTrips : []).filter((t: any) => {
+      const tripEventId = t.route?.eventId || t.route?.event?.id || t.eventId;
+      const isBookedEvent = tripEventId && bookedEventIds.has(tripEventId);
+      const isBookedTrip = bookedTripIds.has(t.id);
+      return isBookedEvent || isBookedTrip;
+    });
+
     return (
       <div className="space-y-5 sm:space-y-6 max-w-5xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
         {/* Top Header Card */}
@@ -218,14 +238,14 @@ export default function ParticipantTrack() {
                 LIVE RADAR RADIAL
               </span>
               <span className="text-[11px] sm:text-xs font-mono text-neutral-400">
-                {activeList.length} Active {activeList.length === 1 ? 'Shuttle' : 'Shuttles'}
+                {activeList.length} Active Booked {activeList.length === 1 ? 'Shuttle' : 'Shuttles'}
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
-              Select Active Shuttle Fleet
+              My Booked Shuttle Radar
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-xl">
-              Select any live vehicle on the road to stream real-time GPS coordinates, arrival times, and stop progression.
+              Live GPS tracking and stop progression for shuttles associated with your reserved event passes.
             </p>
           </div>
 
@@ -241,17 +261,40 @@ export default function ParticipantTrack() {
         </div>
 
         {/* Fleet Grid or Empty State */}
-        {activeList.length === 0 ? (
+        {!hasBookedEvents ? (
+          <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-8 sm:p-12 text-center bg-white dark:bg-[#14161c] space-y-4 shadow-xs">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+              <Ticket className="h-7 w-7 sm:h-8 sm:w-8 opacity-60 text-[#ffac00]" />
+            </div>
+            <div className="space-y-1 max-w-md mx-auto">
+              <p className="text-base font-bold text-neutral-900 dark:text-white">
+                No Booked Events Found
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                Live Radar only tracks shuttles for events you have booked passes for. Choose an upcoming event and reserve your pass to track shuttles in real-time.
+              </p>
+            </div>
+            <div className="flex items-center justify-center pt-2">
+              <button
+                onClick={() => navigate('/participant/bookings')}
+                className="rounded-full bg-[#ffac00] hover:bg-[#e59b00] text-neutral-950 font-black px-6 py-2.5 text-xs shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Ticket className="h-3.5 w-3.5 text-neutral-950" />
+                Book Shuttle Pass
+              </button>
+            </div>
+          </div>
+        ) : activeList.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-8 sm:p-12 text-center bg-white dark:bg-[#14161c] space-y-4 shadow-xs">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
               <Bus className="h-7 w-7 sm:h-8 sm:w-8 opacity-60 text-[#ffac00]" />
             </div>
             <div className="space-y-1 max-w-md mx-auto">
               <p className="text-base font-bold text-neutral-900 dark:text-white">
-                No Active Shuttles on the Road
+                No Active Shuttles on the Road for Your Events
               </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                There are currently no active shuttle runs broadcasting telemetry. Once a driver begins a scheduled trip, live GPS radar will appear here automatically.
+                You have active event bookings, but no shuttles are currently in transit right now. Once a driver starts the shuttle run on event day, live telemetry will broadcast here automatically.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3 pt-2">
@@ -266,7 +309,7 @@ export default function ParticipantTrack() {
                 onClick={() => navigate('/participant/bookings')}
                 className="w-full sm:w-auto rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 font-bold px-5 py-2.5 text-xs transition-all text-neutral-800 dark:text-neutral-200"
               >
-                Book Shuttle Pass
+                Book Another Pass
               </button>
             </div>
           </div>
@@ -283,9 +326,16 @@ export default function ParticipantTrack() {
                     <span className="w-1.5 h-1.5 rounded-full bg-[#629b5c] animate-pulse" />
                     LIVE TELEMETRY
                   </span>
-                  <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2.5 py-0.5 rounded-full truncate">
-                    {t.vehicle?.busNumber || 'Express Bus'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {t.route?.event?.name && (
+                      <span className="text-[10px] font-bold text-[#ffac00] bg-[#ffac00]/10 border border-[#ffac00]/25 px-2 py-0.5 rounded-full truncate max-w-[140px]">
+                        {t.route.event.name}
+                      </span>
+                    )}
+                    <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2.5 py-0.5 rounded-full truncate">
+                      {t.vehicle?.busNumber || 'Express Bus'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-1 min-w-0">
@@ -323,11 +373,17 @@ export default function ParticipantTrack() {
       {/* 1. Cockpit Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-neutral-200/80 dark:border-neutral-800 pb-4 sm:pb-5">
         <div className="space-y-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-extrabold tracking-widest uppercase bg-[#629b5c]/15 text-[#629b5c] border border-[#629b5c]/30 shadow-xs shrink-0">
               <span className="w-1.5 h-1.5 rounded-full bg-[#629b5c] animate-pulse" />
               LIVE RADAR ACTIVE
             </span>
+            {trip?.route?.event?.name && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#ffac00]/15 text-[#ffac00] border border-[#ffac00]/30 shrink-0">
+                <Ticket className="h-3 w-3" />
+                {trip.route.event.name}
+              </span>
+            )}
             {trip?.vehicle?.busNumber && (
               <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-500 dark:text-neutral-400 truncate">
                 Shuttle #{trip.vehicle.busNumber}
@@ -346,6 +402,12 @@ export default function ParticipantTrack() {
 
         {/* Right Actions & Status Pill */}
         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <button
+            onClick={() => navigate('/participant/track')}
+            className="rounded-full h-9 sm:h-10 px-3.5 sm:px-4 text-xs font-bold border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 shadow-xs transition-all"
+          >
+            <ChevronRight className="h-3.5 w-3.5 rotate-180" /> All Booked Shuttles
+          </button>
           {userPos && (
             <button
               onClick={locateMe}

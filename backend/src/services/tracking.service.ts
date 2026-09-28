@@ -120,7 +120,20 @@ export class TrackingService {
       include: {
         vehicle: { select: { id: true, busNumber: true, plateNumber: true, capacity: true, currentLat: true, currentLng: true } },
         driver: { include: { user: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
-        route: { select: { id: true, name: true, origin: true, destination: true, originLat: true, originLng: true, destinationLat: true, destinationLng: true } },
+        route: {
+          select: {
+            id: true,
+            name: true,
+            origin: true,
+            destination: true,
+            originLat: true,
+            originLng: true,
+            destinationLat: true,
+            destinationLng: true,
+            eventId: true,
+            event: { select: { id: true, name: true, date: true } },
+          },
+        },
         _count: { select: { reservations: true } },
       },
       orderBy: { departureTime: 'asc' },

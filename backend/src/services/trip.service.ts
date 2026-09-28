@@ -2,7 +2,7 @@ import prisma from '../config/database';
 import { AppError } from '../middleware/error.middleware';
 
 export class TripService {
-  async findAll(params: { page?: number; limit?: number; status?: string; driverId?: string; routeId?: string; date?: string; eventId?: string }) {
+  async findAll(params: { page?: number; limit?: number; status?: string; driverId?: string; routeId?: string; date?: string }) {
     const page = Number(params.page) || 1;
     const limit = Number(params.limit) || 10;
     const skip = (page - 1) * limit;
@@ -11,7 +11,6 @@ export class TripService {
     if (params.status) where.status = params.status;
     if (params.driverId) where.driverId = params.driverId;
     if (params.routeId) where.routeId = params.routeId;
-    if (params.eventId) where.route = { eventId: params.eventId };
     if (params.date) where.date = { gte: new Date(params.date) };
 
     const [data, total] = await Promise.all([
@@ -21,7 +20,7 @@ export class TripService {
         include: {
           driver: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
           vehicle: true,
-          route: { include: { stops: { orderBy: { order: 'asc' } } } },
+          route: { include: { stops: { orderBy: { order: 'asc' } }, event: { select: { id: true, name: true, date: true } } } },
           _count: { select: { reservations: true } },
         },
       }),
@@ -36,7 +35,7 @@ export class TripService {
       include: {
         driver: { include: { user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } } } },
         vehicle: true,
-        route: { include: { stops: { orderBy: { order: 'asc' } } } },
+        route: { include: { stops: { orderBy: { order: 'asc' } }, event: { select: { id: true, name: true, date: true } } } },
         reservations: { include: { participant: { select: { id: true, firstName: true, lastName: true, email: true } }, pickupPoint: true } },
         trackingLogs: { orderBy: { timestamp: 'desc' }, take: 50 },
       },
