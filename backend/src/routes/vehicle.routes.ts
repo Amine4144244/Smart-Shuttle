@@ -7,7 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/available', vehicleController.getAvailable);
-router.get('/', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.findAll);
+router.get('/', authorize('SUPER_ADMIN', 'ORGANIZER', 'DRIVER'), vehicleController.findAll);
 router.get('/:id', vehicleController.findById);
 router.post('/', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.create);
 router.put('/:id', authorize('SUPER_ADMIN', 'ORGANIZER'), vehicleController.update);

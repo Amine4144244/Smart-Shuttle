@@ -37,8 +37,12 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
     req.user = { userId: user.id, email: user.email, role: user.role };
     next();
-  } catch (error) {
-    return res.status(500).json({ message: 'Authentication failed.' });
+  } catch (error: any) {
+    console.error('Authentication middleware error:', error);
+    return res.status(500).json({
+      message: 'Authentication failed.',
+      error: process.env.NODE_ENV === 'development' ? error?.message : undefined,
+    });
   }
 };
 
