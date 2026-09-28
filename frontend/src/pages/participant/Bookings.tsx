@@ -599,7 +599,7 @@ export default function ParticipantBookings() {
                   </div>
 
                   {/* Scheduled Departure Time Slots (if created by Admin) */}
-                  {scheduledDepartureTimes.length > 0 && (
+                  {scheduledDepartureTimes.length > 0 ? (
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-bold uppercase text-neutral-500 dark:text-neutral-400 block">
                         Horaires officiels programmés :
@@ -629,23 +629,14 @@ export default function ParticipantBookings() {
                         })}
                       </div>
                     </div>
+                  ) : (
+                    <div className="flex items-center gap-2 p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200/60 dark:border-neutral-800 text-xs">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-[11px] text-muted-foreground">
+                        Départ standard fixé à {selectedEventObj?.startTime?.slice(0, 5) || '08:30'}
+                      </span>
+                    </div>
                   )}
-
-                  {/* Exact Time Input (locked to the fixed date) */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold uppercase text-neutral-500 dark:text-neutral-400 block">
-                      Heure de départ souhaitée :
-                    </label>
-                    <input
-                      type="time"
-                      value={pickupTime.includes('T') ? pickupTime.split('T')[1].slice(0, 5) : '08:30'}
-                      onChange={(e) => {
-                        const targetDate = fixedDepartureDate || (selectedEventObj?.date ? new Date(selectedEventObj.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
-                        setPickupTime(`${targetDate}T${e.target.value}`);
-                      }}
-                      className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2 text-xs font-mono font-bold text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
-                    />
-                  </div>
                 </div>
 
                 {/* Contact Phone */}
