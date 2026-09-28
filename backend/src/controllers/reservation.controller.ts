@@ -3,6 +3,34 @@ import { reservationService } from '../services/reservation.service';
 import { matchingService } from '../services/matching.service';
 import { AppError } from '../middleware/error.middleware';
 
+function toValidDate(val: any, fallback?: Date): Date {
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return val;
+  }
+  if (typeof val === 'string' && val.trim()) {
+    const trimmed = val.trim();
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const d2 = new Date(`${trimmed}T00:00:00.000Z`);
+      if (!isNaN(d2.getTime())) return d2;
+    }
+
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      const today = new Date().toISOString().slice(0, 10);
+      const timeClean = trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+      const d3 = new Date(`${today}T${timeClean}.000Z`);
+      if (!isNaN(d3.getTime())) return d3;
+    }
+  }
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return fallback ? toValidDate(fallback) : new Date();
+}
+
 export class ReservationController {
   async findAll(req: Request, res: Response, next: NextFunction) {
     try { const result = await reservationService.findAll(req.query as any); res.json(result); }
@@ -32,25 +60,29 @@ export class ReservationController {
         data.passengerCount = parseInt(data.passengerCount, 10);
       }
 
-      // Safe date normalization
-      const dateStr = typeof data.date === 'string'
-        ? data.date.slice(0, 10)
-        : (data.date instanceof Date ? data.date.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
-      data.date = new Date(`${dateStr}T00:00:00.000Z`);
+      // Convert date to valid Date object
+      const validDate = toValidDate(data.date);
+      const dateStr = validDate.toISOString().slice(0, 10);
+      data.date = validDate;
 
-      // Safe time normalization
-      const rawTime = typeof data.time === 'string'
-        ? data.time
-        : (data.time instanceof Date ? data.time.toTimeString().slice(0, 5) : '08:30');
-      const timeClean = rawTime.length === 5 ? `${rawTime}:00` : rawTime.slice(0, 8);
-      data.time = new Date(`${dateStr}T${timeClean}Z`);
-
-      // Safe pickupTime normalization as a Date object
-      if (data.pickupTime) {
-        const pt = new Date(data.pickupTime);
-        data.pickupTime = isNaN(pt.getTime()) ? data.time : pt;
+      // Convert time to valid Date object
+      let validTime: Date;
+      if (typeof data.time === 'string' && /^\d{1,2}:\d{2}/.test(data.time.trim())) {
+        const timePart = data.time.trim().slice(0, 5);
+        validTime = new Date(`${dateStr}T${timePart}:00.000Z`);
+        if (isNaN(validTime.getTime())) {
+          validTime = toValidDate(data.time, validDate);
+        }
       } else {
-        data.pickupTime = data.time;
+        validTime = toValidDate(data.time, validDate);
+      }
+      data.time = validTime;
+
+      // Convert pickupTime to valid Date object
+      if (data.pickupTime) {
+        data.pickupTime = toValidDate(data.pickupTime, validTime);
+      } else {
+        data.pickupTime = validTime;
       }
 
       const reservation = await reservationService.create(data);

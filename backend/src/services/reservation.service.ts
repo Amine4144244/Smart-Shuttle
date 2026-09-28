@@ -5,18 +5,47 @@ import { generateQrToken, verifyQrToken } from '../utils/jwt';
 import { matchingService } from './matching.service';
 import { emitToUser, emitToRole, emitToTrip } from './socket.service';
 
+function toValidDate(val: any, fallback?: Date): Date {
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return val;
+  }
+  if (typeof val === 'string' && val.trim()) {
+    const trimmed = val.trim();
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) return d;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const d2 = new Date(`${trimmed}T00:00:00.000Z`);
+      if (!isNaN(d2.getTime())) return d2;
+    }
+
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      const today = new Date().toISOString().slice(0, 10);
+      const timeClean = trimmed.length === 5 ? `${trimmed}:00` : trimmed;
+      const d3 = new Date(`${today}T${timeClean}.000Z`);
+      if (!isNaN(d3.getTime())) return d3;
+    }
+  }
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return fallback ? toValidDate(fallback) : new Date();
+}
+
 export class ReservationService {
   private generateCode() {
     return 'SHR-' + uuid().slice(0, 8).toUpperCase();
   }
 
   generateQrToken(reservation: { id: string; reservationCode: string; eventId: string; participantId: string; date: Date }) {
+    const validDate = toValidDate(reservation.date);
     const payload = {
       sub: reservation.id,
       code: reservation.reservationCode,
       eventId: reservation.eventId,
       participantId: reservation.participantId,
-      date: reservation.date.toISOString(),
+      date: validDate.toISOString(),
       iat: Math.floor(Date.now() / 1000),
     };
     return generateQrToken(payload);
@@ -217,15 +246,15 @@ export class ReservationService {
           eventId: data.eventId,
           pickupPointId: data.pickupPointId,
           routeId: data.routeId,
-          date: data.date instanceof Date ? data.date : new Date(data.date),
-          time: data.time instanceof Date ? data.time : new Date(data.time),
+          date: toValidDate(data.date),
+          time: toValidDate(data.time),
           notes: data.notes,
           passengerCount,
           contactPhone: data.contactPhone,
           pickupLatitude: data.pickupLatitude ?? (data as any).pickupLat,
           pickupLongitude: data.pickupLongitude ?? (data as any).pickupLng,
           pickupAddress: data.pickupAddress,
-          pickupTime: data.pickupTime instanceof Date ? data.pickupTime : (data.pickupTime ? new Date(data.pickupTime) : (data.time instanceof Date ? data.time : new Date(data.time))),
+          pickupTime: toValidDate(data.pickupTime, toValidDate(data.time)),
           reservationCode: code,
           qrCode: '',
           status: 'PENDING',
