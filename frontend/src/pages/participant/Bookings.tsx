@@ -77,9 +77,22 @@ export default function ParticipantBookings() {
 
   const selectedEventObj = events?.data?.find((e: any) => e.id === selectedEvent);
 
+  const parseIsoDate = (d: any): string => {
+    if (!d) return '';
+    if (typeof d === 'string' && d.length >= 10 && d.includes('-')) {
+      return d.slice(0, 10);
+    }
+    try {
+      const dt = new Date(d);
+      return isNaN(dt.getTime()) ? '' : dt.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   // Determine fixed departure date from scheduled trips or event date
-  const scheduledTripDate = eventTrips[0]?.date ? new Date(eventTrips[0].date).toISOString().split('T')[0] : null;
-  const fixedDepartureDate = scheduledTripDate || (selectedEventObj?.date ? new Date(selectedEventObj.date).toISOString().split('T')[0] : '');
+  const scheduledTripDate = eventTrips[0]?.date ? parseIsoDate(eventTrips[0].date) : null;
+  const fixedDepartureDate = scheduledTripDate || (selectedEventObj?.date ? parseIsoDate(selectedEventObj.date) : '');
 
   const scheduledDepartureTimes: string[] = Array.from(
     new Set<string>(
@@ -159,14 +172,28 @@ export default function ParticipantBookings() {
       toast.error('Please select an official station or detect your GPS location');
       return;
     }
-    if (!pickupTime) {
-      toast.error('Please select your preferred pickup time');
-      return;
+
+    let dateStr = '';
+    let timeStr = '08:30';
+
+    if (pickupTime && pickupTime.includes('T')) {
+      const parts = pickupTime.split('T');
+      dateStr = parts[0];
+      timeStr = parts[1]?.slice(0, 5) || '08:30';
+    } else if (pickupTime && pickupTime.includes(' ')) {
+      const parts = pickupTime.split(' ');
+      dateStr = parts[0];
+      timeStr = parts[1]?.slice(0, 5) || '08:30';
+    } else if (pickupTime && pickupTime.includes(':')) {
+      timeStr = pickupTime.slice(0, 5);
+      dateStr = fixedDepartureDate || parseIsoDate(selectedEventObj?.date) || new Date().toISOString().split('T')[0];
     }
 
-    const pickupDateObj = new Date(pickupTime);
-    const dateStr = pickupDateObj.toISOString().split('T')[0];
-    const timeStr = pickupDateObj.toTimeString().slice(0, 5);
+    if (!dateStr) {
+      dateStr = fixedDepartureDate || parseIsoDate(selectedEventObj?.date) || new Date().toISOString().split('T')[0];
+    }
+
+    const finalPickupTime = `${dateStr}T${timeStr}`;
 
     bookMutation.mutate({
       eventId: selectedEvent,
@@ -174,7 +201,7 @@ export default function ParticipantBookings() {
       pickupLat: Number(pickupLat),
       pickupLng: Number(pickupLng),
       pickupAddress: pickupAddress || 'Custom GPS Pickup Location',
-      pickupTime,
+      pickupTime: finalPickupTime,
       date: dateStr,
       time: timeStr,
       passengerCount: Number(passengerCount),
@@ -208,9 +235,7 @@ export default function ParticipantBookings() {
     }
     setSelectedEvent(event.id);
     const eventTripsForThis = allTrips.filter((t: any) => t.route?.eventId === event.id);
-    const dateStr = eventTripsForThis[0]?.date
-      ? new Date(eventTripsForThis[0].date).toISOString().split('T')[0]
-      : (event.date ? new Date(event.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    const dateStr = parseIsoDate(eventTripsForThis[0]?.date) || parseIsoDate(event.date) || new Date().toISOString().split('T')[0];
     const timeStr = eventTripsForThis[0]?.departureTime?.slice(0, 5) || event.startTime?.slice(0, 5) || '08:30';
     setPickupTime(`${dateStr}T${timeStr}`);
     setStep('select-pickup');
