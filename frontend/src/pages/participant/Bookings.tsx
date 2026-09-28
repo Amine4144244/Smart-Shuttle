@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { eventsApi, reservationsApi, pickupPointsApi, tripsApi } from '@/services/api';
@@ -44,6 +44,13 @@ export default function ParticipantBookings() {
   const [showMatches, setShowMatches] = useState(false);
   const [searching, setSearching] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Sync user phone when profile is loaded
+  useEffect(() => {
+    if (user?.phone && !contactPhone) {
+      setContactPhone(user.phone);
+    }
+  }, [user?.phone, contactPhone]);
 
   const { data: events, isLoading: isEventsLoading } = useQuery({
     queryKey: ['events-list'],
@@ -666,11 +673,18 @@ export default function ParticipantBookings() {
                   )}
                 </div>
 
-                {/* Contact Phone */}
+                {/* Participant Phone */}
                 <div className="space-y-1.5">
-                  <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
-                    Contact Phone (Driver SMS updates)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 block">
+                      Téléphone du Participant (Pour alertes & notifications)
+                    </label>
+                    {user?.phone && contactPhone === user.phone && (
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                        ✓ Compte vérifié
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none">
                       <Phone className="h-3.5 w-3.5" />
@@ -683,6 +697,9 @@ export default function ParticipantBookings() {
                       className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 pl-9 pr-3 py-2.5 text-xs text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                     />
                   </div>
+                  <p className="text-[10px] text-neutral-400">
+                    Votre numéro personnel pour recevoir votre confirmation et le suivi en direct de la navette.
+                  </p>
                 </div>
 
                 {/* Special Notes */}
