@@ -56,14 +56,94 @@ export default function ParticipantTrack() {
 
   const { data: trip, isLoading } = useQuery({
     queryKey: ['trip', tripId],
-    queryFn: () => tripsApi.getById(tripId!).then((r) => r.data),
+    queryFn: () => tripsApi.getById(tripId!).then((r) => r.data).catch(() => null),
     enabled: !!tripId,
   });
 
+  // Fallback queries if no tripId is provided or if trip not found
+  const { data: activeTrips, isLoading: isActiveTripsLoading } = useQuery({
+    queryKey: ['active-trips-list'],
+    queryFn: () => tripsApi.getActive().then((r) => r.data).catch(() => []),
+  });
+
+  const { data: myReservations, isLoading: isReservationsLoading } = useQuery({
+    queryKey: ['my-reservations-track'],
+    queryFn: () => reservationsApi.getMyReservations().then((r) => r.data).catch(() => []),
+  });
+
+  // Calculate active valid reservations and corresponding booked event/trip IDs
+  const validReservations = (Array.isArray(myReservations) ? myReservations : []).filter(
+    (r: any) => !['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(r.status)
+  );
+
+  const bookedEventIds = new Set(
+    validReservations.map((r: any) => r.event?.id || r.eventId).filter(Boolean)
+  );
+
+  const bookedTripIds = new Set(
+    validReservations.map((r: any) => r.trip?.id || r.tripId).filter(Boolean)
+  );
+
+  const hasBookedEvents = validReservations.length > 0;
+
+  // Fallback trip resolution from participant reservations if direct trip API fails or for route-only items
+  const fallbackTripFromReservation = (!trip && tripId && validReservations.length > 0)
+    ? (() => {
+        for (const r of validReservations) {
+          if (r.trip?.id === tripId) return r.trip;
+          if (r.id === tripId) {
+            return {
+              id: r.id,
+              status: r.status || 'SCHEDULED',
+              date: r.date,
+              departureTime: r.time || r.event?.startTime,
+              route: r.route || {
+                name: `${r.event?.name || 'Event'} Shuttle Service`,
+                origin: r.pickupAddress || r.pickupPoint?.name || 'Selected Station',
+                originLat: r.pickupLatitude,
+                originLng: r.pickupLongitude,
+                destination: r.event?.address || 'Event Destination',
+                destinationLat: r.event?.latitude,
+                destinationLng: r.event?.longitude,
+                eventId: r.event?.id,
+                event: r.event,
+                stops: r.pickupPoint ? [{ latitude: r.pickupPoint.latitude, longitude: r.pickupPoint.longitude, name: r.pickupPoint.name }] : [],
+              },
+              vehicle: null,
+              driver: null,
+            };
+          }
+          if (r.event?.routes) {
+            for (const route of r.event.routes) {
+              if (route.id === tripId) {
+                return {
+                  id: route.id,
+                  status: 'SCHEDULED',
+                  date: r.date || r.event.date,
+                  departureTime: r.event.startTime,
+                  route: { ...route, event: r.event },
+                  vehicle: null,
+                  driver: null,
+                };
+              }
+              if (route.trips) {
+                for (const t of route.trips) {
+                  if (t.id === tripId) return { ...t, route: { ...route, event: r.event } };
+                }
+              }
+            }
+          }
+        }
+        return null;
+      })()
+    : null;
+
+  const currentTrip = trip || fallbackTripFromReservation;
+
   useEffect(() => {
-    if (trip?.status) setTripStatus(trip.status);
-    if (trip?.currentLat && trip?.currentLng) setLivePos([trip.currentLat, trip.currentLng]);
-  }, [trip]);
+    if (currentTrip?.status) setTripStatus(currentTrip.status);
+    if (currentTrip?.currentLat && currentTrip?.currentLng) setLivePos([currentTrip.currentLat, currentTrip.currentLng]);
+  }, [currentTrip]);
 
   useEffect(() => {
     if (!tripId) return;
@@ -127,65 +207,145 @@ export default function ParticipantTrack() {
   };
 
   const StatusIcon = STATUS_SEQUENCE.find((s) => s.status === tripStatus)?.icon || Clock;
-  const progress = trip?.tripProgress !== undefined ? Math.round(trip.tripProgress) : liveProgress;
-  const speed = trip?.currentSpeed || liveSpeed;
-  const eta = liveEta || (trip?.estimatedArrival ? formatTime(trip.estimatedArrival) : null);
+  const progress = currentTrip?.tripProgress !== undefined ? Math.round(currentTrip.tripProgress) : liveProgress;
+  const speed = currentTrip?.currentSpeed || liveSpeed;
+  const eta = liveEta || (currentTrip?.estimatedArrival ? formatTime(currentTrip.estimatedArrival) : null);
   const distance = liveDistance;
 
   const stopPoints: MapPoint[] =
-    trip?.route?.stops?.map((s: any) => ({
+    currentTrip?.route?.stops?.map((s: any) => ({
       lat: s.latitude,
       lng: s.longitude,
       name: s.name,
     })) || [];
 
-  // Fallback queries if no tripId is provided or if trip not found
-  const { data: activeTrips, isLoading: isActiveTripsLoading } = useQuery({
-    queryKey: ['active-trips-list'],
-    queryFn: () => tripsApi.getActive().then((r) => r.data),
+  // Build the complete list of booked shuttles and events for the participant
+  const seenTripIds = new Set<string>();
+  const bookedShuttleList: any[] = [];
+
+  // 1. From activeTrips (matching booked events or booked trip IDs)
+  (Array.isArray(activeTrips) ? activeTrips : []).forEach((t: any) => {
+    const tripEventId = t.route?.eventId || t.route?.event?.id || t.eventId;
+    const isBookedEvent = tripEventId && bookedEventIds.has(tripEventId);
+    const isBookedTrip = bookedTripIds.has(t.id);
+    if ((isBookedEvent || isBookedTrip) && !seenTripIds.has(t.id)) {
+      seenTripIds.add(t.id);
+      bookedShuttleList.push(t);
+    }
   });
 
-  const { data: myReservations, isLoading: isReservationsLoading } = useQuery({
-    queryKey: ['my-reservations-track'],
-    queryFn: () => reservationsApi.getMyReservations().then((r) => r.data),
+  // 2. From reservation.trip and reservation.event.routes
+  validReservations.forEach((r: any) => {
+    if (r.trip?.id && !seenTripIds.has(r.trip.id)) {
+      seenTripIds.add(r.trip.id);
+      bookedShuttleList.push({
+        ...r.trip,
+        route: r.trip.route || r.route || {
+          name: `${r.event?.name || 'Event'} Transit Line`,
+          origin: r.pickupAddress || r.pickupPoint?.name || 'Pickup Point',
+          destination: r.event?.address || 'Event Venue',
+          eventId: r.event?.id,
+          event: r.event,
+        },
+      });
+    }
+
+    if (r.event?.routes && Array.isArray(r.event.routes)) {
+      r.event.routes.forEach((route: any) => {
+        if (route.trips && Array.isArray(route.trips)) {
+          route.trips.forEach((trip: any) => {
+            if (trip?.id && !seenTripIds.has(trip.id)) {
+              seenTripIds.add(trip.id);
+              bookedShuttleList.push({
+                ...trip,
+                route: {
+                  ...route,
+                  eventId: r.event.id,
+                  event: { id: r.event.id, name: r.event.name, date: r.event.date },
+                },
+              });
+            }
+          });
+        }
+      });
+    }
   });
 
-  // Calculate active valid reservations and corresponding booked event/trip IDs
-  const validReservations = (Array.isArray(myReservations) ? myReservations : []).filter(
-    (r: any) => !['CANCELLED', 'REJECTED', 'NO_SHOW'].includes(r.status)
-  );
+  // 3. If an event has routes configured but no trips created yet, add route entry so participant sees it
+  validReservations.forEach((r: any) => {
+    const eventId = r.event?.id;
+    if (!eventId) return;
 
-  // Map each booked reservation to its corresponding active/scheduled trip (if available)
-  const bookedEventCards = validReservations.map((res: any) => {
-    const eventId = res.event?.id || res.eventId;
-    const matchingTrip = (Array.isArray(activeTrips) ? activeTrips : []).find((t: any) => {
-      const tripEventId = t.route?.eventId || t.route?.event?.id || t.eventId;
-      return (t.id && (t.id === res.tripId || t.id === res.trip?.id)) || (tripEventId && tripEventId === eventId);
-    }) || res.trip;
+    const hasTripForEvent = bookedShuttleList.some(
+      (item) => (item.route?.eventId || item.route?.event?.id || item.eventId) === eventId
+    );
 
-    return {
-      reservation: res,
-      event: res.event,
-      pickupPoint: res.pickupPoint,
-      trip: matchingTrip,
-    };
+    if (!hasTripForEvent) {
+      if (r.event?.routes && r.event.routes.length > 0) {
+        r.event.routes.forEach((route: any) => {
+          const pseudoId = `route-${route.id}`;
+          if (!seenTripIds.has(pseudoId)) {
+            seenTripIds.add(pseudoId);
+            bookedShuttleList.push({
+              id: route.id,
+              isRouteOnly: true,
+              status: 'SCHEDULED',
+              date: r.date || r.event.date,
+              departureTime: r.event.startTime || r.date,
+              route: {
+                ...route,
+                eventId: r.event.id,
+                event: { id: r.event.id, name: r.event.name, date: r.event.date },
+              },
+              vehicle: null,
+              driver: null,
+              reservation: r,
+            });
+          }
+        });
+      } else {
+        const pseudoId = `res-${r.id}`;
+        if (!seenTripIds.has(pseudoId)) {
+          seenTripIds.add(pseudoId);
+          bookedShuttleList.push({
+            id: r.id,
+            isReservationOnly: true,
+            status: r.status || 'CONFIRMED',
+            date: r.date || r.event.date,
+            departureTime: r.time || r.event?.startTime,
+            route: {
+              name: `${r.event?.name || 'Event'} Shuttle Service`,
+              origin: r.pickupAddress || r.pickupPoint?.name || 'Designated Station',
+              originLat: r.pickupLatitude,
+              originLng: r.pickupLongitude,
+              destination: r.event?.address || 'Event Venue',
+              destinationLat: r.event?.latitude,
+              destinationLng: r.event?.longitude,
+              eventId: r.event?.id,
+              event: { id: r.event?.id, name: r.event?.name, date: r.event?.date },
+            },
+            vehicle: null,
+            driver: null,
+            reservation: r,
+          });
+        }
+      }
+    }
   });
 
-  const hasBookedEvents = bookedEventCards.length > 0;
-
-  const originPoint = trip?.route
+  const originPoint = currentTrip?.route
     ? {
-        lat: trip.route.originLat || 0,
-        lng: trip.route.originLng || 0,
-        name: trip.route.origin,
+        lat: currentTrip.route.originLat || 0,
+        lng: currentTrip.route.originLng || 0,
+        name: currentTrip.route.origin,
       }
     : undefined;
 
-  const destPoint = trip?.route
+  const destPoint = currentTrip?.route
     ? {
-        lat: trip.route.destinationLat || 0,
-        lng: trip.route.destinationLng || 0,
-        name: trip.route.destination,
+        lat: currentTrip.route.destinationLat || 0,
+        lng: currentTrip.route.destinationLng || 0,
+        name: currentTrip.route.destination,
       }
     : undefined;
 
@@ -213,8 +373,8 @@ export default function ParticipantTrack() {
     );
   }
 
-  // If no trip is loaded or selected: Display Participant's Booked Events & Shuttles
-  if (!trip) {
+  // If no trip is loaded or selected: Fleet Selection View (Filtered strictly to booked events)
+  if (!currentTrip) {
     return (
       <div className="space-y-5 sm:space-y-6 max-w-5xl mx-auto pb-12 font-sans selection:bg-[#ffac00] selection:text-black">
         {/* Top Header Card */}
@@ -226,30 +386,23 @@ export default function ParticipantTrack() {
                 LIVE RADAR RADIAL
               </span>
               <span className="text-[11px] sm:text-xs font-mono text-neutral-400">
-                {bookedEventCards.length} Booked {bookedEventCards.length === 1 ? 'Event' : 'Events'}
+                {bookedShuttleList.length} Booked {bookedShuttleList.length === 1 ? 'Shuttle' : 'Shuttles'}
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-neutral-950 dark:text-white">
               My Booked Shuttle Radar
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 max-w-xl">
-              Real-time GPS radar and live telemetry for shuttles associated with your booked events.
+              Live GPS tracking and stop progression for shuttles associated with your reserved event passes.
             </p>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
-              onClick={() => navigate('/participant/bookings')}
-              className="rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 font-bold px-4 py-2 text-xs shadow-xs transition-all flex items-center gap-1.5 text-neutral-800 dark:text-neutral-200"
-            >
-              <Ticket className="h-3.5 w-3.5 text-[#ffac00]" />
-              Book Shuttle Pass
-            </button>
-            <button
               onClick={() => navigate('/participant/tickets')}
               className="rounded-full bg-neutral-900 hover:bg-neutral-800 text-white dark:bg-neutral-100 dark:text-neutral-900 font-bold px-4 py-2 text-xs shadow-xs transition-all flex items-center gap-1.5"
             >
-              <CheckCircle2 className="h-3.5 w-3.5 text-[#629b5c]" />
+              <Ticket className="h-3.5 w-3.5 text-[#ffac00]" />
               My Passes
             </button>
           </div>
@@ -266,7 +419,7 @@ export default function ParticipantTrack() {
                 No Booked Events Found
               </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
-                Live Radar only tracks shuttles for events you have reserved passes for. Reserve a shuttle pass for an upcoming event to unlock live GPS telemetry.
+                Live Radar only tracks shuttles for events you have booked passes for. Choose an upcoming event and reserve your pass to track shuttles in real-time.
               </p>
             </div>
             <div className="flex items-center justify-center pt-2">
@@ -279,133 +432,94 @@ export default function ParticipantTrack() {
               </button>
             </div>
           </div>
+        ) : bookedShuttleList.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-neutral-300 dark:border-neutral-800 p-8 sm:p-12 text-center bg-white dark:bg-[#14161c] space-y-4 shadow-xs">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-3xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+              <Bus className="h-7 w-7 sm:h-8 sm:w-8 opacity-60 text-[#ffac00]" />
+            </div>
+            <div className="space-y-1 max-w-md mx-auto">
+              <p className="text-base font-bold text-neutral-900 dark:text-white">
+                No Active Shuttles on the Road for Your Events
+              </p>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                You have active event bookings, but no shuttles are currently in transit right now. Once a driver starts the shuttle run on event day, live telemetry will broadcast here automatically.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3 pt-2">
+              <button
+                onClick={() => navigate('/participant/tickets')}
+                className="w-full sm:w-auto rounded-full bg-[#ffac00] hover:bg-[#e59b00] text-neutral-950 font-black px-6 py-2.5 text-xs shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Ticket className="h-3.5 w-3.5 text-neutral-950" />
+                View My Boarding Passes
+              </button>
+              <button
+                onClick={() => navigate('/participant/bookings')}
+                className="w-full sm:w-auto rounded-full border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-[#14161c] hover:bg-neutral-100 dark:hover:bg-neutral-800 font-bold px-5 py-2.5 text-xs transition-all text-neutral-800 dark:text-neutral-200"
+              >
+                Book Another Pass
+              </button>
+            </div>
+          </div>
         ) : (
-          <div className="grid gap-4 sm:gap-5 grid-cols-1 md:grid-cols-2">
-            {bookedEventCards.map((card: any) => {
-              const res = card.reservation;
-              const ev = card.event || {};
-              const tr = card.trip;
-              const isTripActive = tr && tr.status === 'IN_PROGRESS';
-              const isTripScheduled = tr && tr.status === 'SCHEDULED';
+          <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
+            {bookedShuttleList.map((t: any) => {
+              const isLive = t.status === 'IN_PROGRESS';
+              const isScheduled = t.status === 'SCHEDULED';
+              const statusText = isLive
+                ? 'LIVE TELEMETRY'
+                : isScheduled
+                ? 'SCHEDULED'
+                : 'PASS CONFIRMED';
+              const statusBadgeClass = isLive
+                ? 'bg-[#629b5c]/15 text-[#629b5c] border-[#629b5c]/30'
+                : isScheduled
+                ? 'bg-[#ffac00]/15 text-[#ffac00] border-[#ffac00]/30'
+                : 'bg-blue-500/15 text-blue-500 border-blue-500/30';
 
               return (
                 <div
-                  key={res.id}
-                  className="group relative p-5 sm:p-6 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/90 dark:border-neutral-800 hover:border-[#ffac00] dark:hover:border-[#ffac00] shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col justify-between space-y-4"
+                  key={t.id}
+                  onClick={() => navigate(`/participant/track/${t.id}`)}
+                  className="group relative p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 hover:border-[#ffac00] dark:hover:border-[#ffac00] shadow-sm hover:shadow-lg cursor-pointer transition-all duration-300 space-y-3 sm:space-y-4"
                 >
-                  {/* Top Status & Event Tag */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      {isTripActive ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-[#629b5c]/15 text-[#629b5c] border border-[#629b5c]/30 shrink-0">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#629b5c] animate-pulse" />
-                          LIVE TELEMETRY ACTIVE
-                        </span>
-                      ) : isTripScheduled ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/15 text-amber-500 border border-amber-500/30 shrink-0">
-                          <Clock className="h-3 w-3" />
-                          SHUTTLE SCHEDULED
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-blue-500/15 text-blue-500 border border-blue-500/30 shrink-0">
-                          <CheckCircle2 className="h-3 w-3" />
-                          BOOKED EVENT PASS
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border shrink-0 ${statusBadgeClass}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-[#629b5c] animate-pulse' : isScheduled ? 'bg-[#ffac00]' : 'bg-blue-500'}`} />
+                      {statusText}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {t.route?.event?.name && (
+                        <span className="text-[10px] font-bold text-[#ffac00] bg-[#ffac00]/10 border border-[#ffac00]/25 px-2 py-0.5 rounded-full truncate max-w-[140px]">
+                          {t.route.event.name}
                         </span>
                       )}
-
-                      <span className="text-[11px] font-mono font-bold text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2.5 py-0.5 rounded-full">
-                        Pass #{res.reservationCode || res.id.slice(0, 8)}
+                      <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-400 bg-neutral-100 dark:bg-neutral-900 px-2.5 py-0.5 rounded-full truncate">
+                        {t.vehicle?.busNumber || (t.isReservationOnly ? 'Pass Active' : 'Shuttle Bus')}
                       </span>
                     </div>
-
-                    {/* Event Name & Date */}
-                    <div>
-                      <h3 className="font-black text-lg sm:text-xl text-neutral-950 dark:text-white group-hover:text-[#ffac00] transition-colors leading-tight">
-                        {ev.name || 'Event Shuttle Transit'}
-                      </h3>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 font-medium mt-0.5">
-                        {res.date ? new Date(res.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : 'Scheduled Event'}
-                      </p>
-                    </div>
-
-                    {/* Route / Pickup Locations */}
-                    <div className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-100 dark:border-neutral-800/80 space-y-2 text-xs">
-                      {res.pickupPoint?.name || res.pickupAddress ? (
-                        <div className="flex items-start gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-[#629b5c] shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">Your Pickup Station</span>
-                            <p className="font-bold text-neutral-900 dark:text-white truncate">
-                              {res.pickupPoint?.name || res.pickupAddress}
-                            </p>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {ev.address && (
-                        <div className="flex items-start gap-2 pt-1.5 border-t border-neutral-200/50 dark:border-neutral-800/50">
-                          <Milestone className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
-                          <div className="min-w-0">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block">Event Destination</span>
-                            <p className="font-medium text-neutral-700 dark:text-neutral-300 truncate">
-                              {ev.address}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Shuttle & Driver Details */}
-                    {tr ? (
-                      <div className="flex items-center justify-between gap-2 text-xs pt-1">
-                        <div className="flex items-center gap-2 truncate">
-                          <div className="w-7 h-7 rounded-xl bg-[#ffac00]/15 text-[#ffac00] flex items-center justify-center font-bold shrink-0">
-                            <Bus className="h-3.5 w-3.5" />
-                          </div>
-                          <div className="truncate">
-                            <span className="font-bold text-neutral-900 dark:text-white block truncate">
-                              {tr.vehicle?.busNumber || 'Fleet Shuttle'}
-                            </span>
-                            <span className="text-[10px] text-neutral-400 block truncate">
-                              Driver: {tr.driver?.user?.firstName || 'Assigned Driver'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {tr.departureTime && (
-                          <span className="text-[11px] font-mono font-bold text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full shrink-0">
-                            {formatTime(tr.departureTime)}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs text-neutral-400 pt-1">
-                        <Users className="h-3.5 w-3.5 text-[#ffac00] shrink-0" />
-                        <span className="text-[11px]">Pass Valid for {res.passengerCount || 1} Passenger(s) • Shuttle standing by</span>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Card Action CTA */}
-                  <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-2">
-                    {tr?.id ? (
-                      <button
-                        onClick={() => navigate(`/participant/track/${tr.id}`)}
-                        className="w-full rounded-2xl bg-[#ffac00] hover:bg-[#e59b00] text-neutral-950 font-black px-4 py-2.5 text-xs shadow-md transition-all flex items-center justify-center gap-2"
-                      >
-                        <Radio className="h-3.5 w-3.5 text-neutral-950 animate-pulse" />
-                        Stream Live Radar
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => navigate('/participant/tickets')}
-                        className="w-full rounded-2xl bg-neutral-950 hover:bg-neutral-800 text-white dark:bg-white dark:text-neutral-950 font-bold px-4 py-2.5 text-xs shadow-xs transition-all flex items-center justify-center gap-2"
-                      >
-                        <Ticket className="h-3.5 w-3.5 text-[#ffac00]" />
-                        View Boarding Pass
-                      </button>
-                    )}
+                  <div className="space-y-1 min-w-0">
+                    <h3 className="font-black text-sm sm:text-base text-neutral-950 dark:text-white group-hover:text-[#ffac00] transition-colors truncate">
+                      {t.route?.name || 'Event Shuttle Transit'}
+                    </h3>
+                    <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 font-medium truncate">
+                      <MapPin className="h-3.5 w-3.5 text-[#629b5c] shrink-0" />
+                      <span className="truncate">{t.route?.origin || 'Pickup Location'}</span>
+                      <ChevronRight className="h-3 w-3 text-neutral-400 shrink-0" />
+                      <span className="truncate text-neutral-700 dark:text-neutral-300 font-bold">{t.route?.destination || 'Event Venue'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2.5 sm:pt-3 border-t border-neutral-100 dark:border-neutral-800/80 text-xs">
+                    <div className="flex items-center gap-1.5 text-neutral-500 truncate">
+                      <Users className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                      <span className="truncate text-[11px] sm:text-xs">Driver: <strong className="text-neutral-800 dark:text-neutral-200">{t.driver?.user?.firstName || (t.isReservationOnly ? 'Assigned upon departure' : 'Assigned')}</strong></span>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[#ffac00] font-black group-hover:translate-x-0.5 transition-transform text-xs shrink-0">
+                      Stream Radar <ChevronRight className="h-3.5 w-3.5" />
+                    </span>
                   </div>
                 </div>
               );
@@ -427,25 +541,25 @@ export default function ParticipantTrack() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#629b5c] animate-pulse" />
               LIVE RADAR ACTIVE
             </span>
-            {trip?.route?.event?.name && (
+            {currentTrip?.route?.event?.name && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#ffac00]/15 text-[#ffac00] border border-[#ffac00]/30 shrink-0">
                 <Ticket className="h-3 w-3" />
-                {trip.route.event.name}
+                {currentTrip.route.event.name}
               </span>
             )}
-            {trip?.vehicle?.busNumber && (
+            {currentTrip?.vehicle?.busNumber && (
               <span className="text-[11px] sm:text-xs font-mono font-bold text-neutral-500 dark:text-neutral-400 truncate">
-                Shuttle #{trip.vehicle.busNumber}
+                Shuttle #{currentTrip.vehicle.busNumber}
               </span>
             )}
           </div>
           <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-neutral-950 dark:text-white truncate">
-            {trip?.route?.name || 'Live Event Transit'}
+            {currentTrip?.route?.name || 'Live Event Transit'}
           </h1>
           <div className="flex items-center gap-1.5 text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 truncate">
-            <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{trip?.route?.origin}</span>
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{currentTrip?.route?.origin}</span>
             <ChevronRight className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-            <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{trip?.route?.destination}</span>
+            <span className="font-semibold text-neutral-800 dark:text-neutral-200 truncate">{currentTrip?.route?.destination}</span>
           </div>
         </div>
 
@@ -627,32 +741,32 @@ export default function ParticipantTrack() {
                 </div>
                 <div className="min-w-0">
                   <h3 className="font-black text-xs sm:text-sm text-neutral-950 dark:text-white truncate">
-                    Bus #{trip?.vehicle?.busNumber || 'Fleet Vehicle'}
+                    Bus #{currentTrip?.vehicle?.busNumber || 'Fleet Vehicle'}
                   </h3>
-                  {trip?.vehicle?.plateNumber && (
+                  {currentTrip?.vehicle?.plateNumber && (
                     <p className="text-[10px] sm:text-[11px] font-mono text-neutral-400 truncate">
-                      Plate: {trip.vehicle.plateNumber}
+                      Plate: {currentTrip.vehicle.plateNumber}
                     </p>
                   )}
                 </div>
               </div>
 
-              {trip?.vehicle?.capacity && (
+              {currentTrip?.vehicle?.capacity && (
                 <span className="text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-900 text-neutral-500 font-bold shrink-0">
-                  {trip.vehicle.capacity} Seats
+                  {currentTrip.vehicle.capacity} Seats
                 </span>
               )}
             </div>
 
             <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 text-xs">
-              {trip?.driver?.user && (
+              {currentTrip?.driver?.user && (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-neutral-500 font-medium text-[11px] sm:text-xs shrink-0">Driver</span>
                   <div className="flex items-center gap-1.5 font-bold text-neutral-900 dark:text-white min-w-0">
-                    <span className="truncate text-[11px] sm:text-xs">{trip.driver.user.firstName} {trip.driver.user.lastName}</span>
-                    {trip.driver.phone && (
+                    <span className="truncate text-[11px] sm:text-xs">{currentTrip.driver.user.firstName} {currentTrip.driver.user.lastName}</span>
+                    {currentTrip.driver.phone && (
                       <a
-                        href={`tel:${trip.driver.phone}`}
+                        href={`tel:${currentTrip.driver.phone}`}
                         className="p-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-[#ffac00] shrink-0"
                         title="Call Driver"
                       >
@@ -662,19 +776,19 @@ export default function ParticipantTrack() {
                   </div>
                 </div>
               )}
-              {trip?.departureTime && (
+              {currentTrip?.departureTime && (
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500 font-medium text-[11px] sm:text-xs">Scheduled Departure</span>
                   <span className="font-mono font-bold text-neutral-900 dark:text-white text-[11px] sm:text-xs">
-                    {formatTime(trip.departureTime)}
+                    {formatTime(currentTrip.departureTime)}
                   </span>
                 </div>
               )}
-              {trip?.reservations && (
+              {currentTrip?.reservations && (
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-500 font-medium text-[11px] sm:text-xs">Passengers</span>
                   <span className="font-mono font-bold text-[#629b5c] text-[11px] sm:text-xs">
-                    {trip.reservations.length} Onboard
+                    {currentTrip.reservations.length} Onboard
                   </span>
                 </div>
               )}
@@ -682,7 +796,7 @@ export default function ParticipantTrack() {
           </div>
 
           {/* Route Station Stops Timeline */}
-          {trip?.route?.stops && trip.route.stops.length > 0 && (
+          {currentTrip?.route?.stops && currentTrip.route.stops.length > 0 && (
             <div className="p-4 sm:p-5 rounded-3xl bg-white dark:bg-[#14161c] border border-neutral-200/80 dark:border-neutral-800 space-y-3 shadow-xs">
               <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400 block">
                 STATION STOPS & TIMELINE
@@ -692,13 +806,13 @@ export default function ParticipantTrack() {
                   <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-[#629b5c] ring-4 ring-[#629b5c]/20 shrink-0" />
                   <div className="truncate">
                     <p className="font-bold text-neutral-950 dark:text-white truncate text-[11px] sm:text-xs">
-                      {trip.route.origin}
+                      {currentTrip.route.origin}
                     </p>
                     <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider font-mono">Origin Departure</span>
                   </div>
                 </div>
 
-                {trip.route.stops.map((stop: any, sIdx: number) => (
+                {currentTrip.route.stops.map((stop: any, sIdx: number) => (
                   <div key={stop.id || sIdx} className="flex items-center gap-2.5 pl-0.5">
                     <div className="h-2 w-2 rounded-full border-2 border-neutral-400 shrink-0" />
                     <div className="truncate">
@@ -712,7 +826,7 @@ export default function ParticipantTrack() {
                   <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
                   <div className="truncate">
                     <p className="font-bold text-neutral-950 dark:text-white truncate text-[11px] sm:text-xs">
-                      {trip.route.destination}
+                      {currentTrip.route.destination}
                     </p>
                     <span className="text-[9px] sm:text-[10px] text-neutral-400 uppercase tracking-wider font-mono">Event Destination</span>
                   </div>

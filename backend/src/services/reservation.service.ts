@@ -638,14 +638,42 @@ export class ReservationService {
       where: { participantId },
       orderBy: { date: 'desc' },
       include: {
-        event: { select: { id: true, name: true, date: true, address: true, posterImage: true } },
+        event: {
+          include: {
+            routes: {
+              include: {
+                stops: { orderBy: { order: 'asc' } },
+                trips: {
+                  include: {
+                    vehicle: true,
+                    driver: { include: { user: true } },
+                    _count: { select: { reservations: true } },
+                  },
+                },
+              },
+            },
+            pickupPoints: true,
+          },
+        },
         pickupPoint: true,
         optimizedPickup: true,
+        route: {
+          include: {
+            stops: { orderBy: { order: 'asc' } },
+            trips: {
+              include: {
+                vehicle: true,
+                driver: { include: { user: true } },
+              },
+            },
+          },
+        },
         waitingListEntry: { select: { status: true, createdAt: true } },
         trip: {
           include: {
             vehicle: true,
             driver: { include: { user: true } },
+            route: { include: { stops: { orderBy: { order: 'asc' } } } },
             _count: { select: { reservations: true } },
           },
         },

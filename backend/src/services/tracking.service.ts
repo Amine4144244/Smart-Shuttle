@@ -116,7 +116,7 @@ export class TrackingService {
 
   async getActiveShuttles() {
     const trips = await prisma.trip.findMany({
-      where: { status: { in: ['IN_PROGRESS', 'SCHEDULED'] }, date: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
+      where: { status: { in: ['IN_PROGRESS', 'SCHEDULED', 'DELAYED', 'BOARDING', 'APPROACHING'] } },
       include: {
         vehicle: { select: { id: true, busNumber: true, plateNumber: true, capacity: true, currentLat: true, currentLng: true } },
         driver: { include: { user: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
