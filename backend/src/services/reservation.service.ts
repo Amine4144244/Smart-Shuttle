@@ -182,6 +182,7 @@ export class ReservationService {
     participantId: string;
     eventId: string;
     pickupPointId?: string;
+    tripId?: string;
     date: Date;
     time: Date;
     routeId?: string;
@@ -216,6 +217,7 @@ export class ReservationService {
           participantId: data.participantId,
           eventId: data.eventId,
           pickupPointId: data.pickupPointId,
+          tripId: data.tripId,
           routeId: data.routeId,
           date: data.date,
           time: data.time,
