@@ -111,6 +111,7 @@ export default function AdminFullPhaseConfig() {
   const [tripRouteId, setTripRouteId] = useState<string>('');
   const [tripVehicleId, setTripVehicleId] = useState<string>('');
   const [tripDriverId, setTripDriverId] = useState<string>('');
+  const [tripDate, setTripDate] = useState<string>('');
   const [tripDepartureTime, setTripDepartureTime] = useState('08:30');
   const [batchIntervalMinutes, setBatchIntervalMinutes] = useState(30);
   const [batchCount, setBatchCount] = useState(3);
@@ -167,7 +168,9 @@ export default function AdminFullPhaseConfig() {
     if (selectedEvent) {
       setEventName(selectedEvent.name || '');
       setEventDesc(selectedEvent.description || '');
-      setEventDate(selectedEvent.date ? selectedEvent.date.split('T')[0] : '');
+      const parsedDate = selectedEvent.date ? selectedEvent.date.split('T')[0] : '';
+      setEventDate(parsedDate);
+      setTripDate(parsedDate);
       setEventStartTime(selectedEvent.startTime ? selectedEvent.startTime.slice(0, 5) : '08:00');
       setEventEndTime(selectedEvent.endTime ? selectedEvent.endTime.slice(0, 5) : '18:00');
       setEventAddress(selectedEvent.address || '');
@@ -378,8 +381,9 @@ export default function AdminFullPhaseConfig() {
   };
 
   const handleCreateTrip = () => {
-    if (!tripRouteId || !tripVehicleId || !tripDriverId || !eventDate) {
-      toast.error('Veuillez sélectionner un itinéraire, un véhicule, un chauffeur et une heure');
+    const targetDate = tripDate || eventDate;
+    if (!tripRouteId || !tripVehicleId || !tripDriverId || !targetDate) {
+      toast.error('Veuillez sélectionner un itinéraire, un véhicule, un chauffeur, une date et une heure');
       return;
     }
 
@@ -388,10 +392,11 @@ export default function AdminFullPhaseConfig() {
       (t: any) =>
         t.routeId === tripRouteId &&
         t.vehicleId === tripVehicleId &&
+        t.date?.slice(0, 10) === targetDate &&
         t.departureTime?.slice(0, 5) === tripDepartureTime?.slice(0, 5)
     );
     if (existingDuplicate) {
-      if (!window.confirm(`Une navette existe déjà pour cet itinéraire à ${tripDepartureTime}. Voulez-vous vraiment programmer un doublon ?`)) {
+      if (!window.confirm(`Une navette existe déjà pour cet itinéraire le ${formatDate(targetDate)} à ${tripDepartureTime}. Voulez-vous vraiment programmer un doublon ?`)) {
         return;
       }
     }
@@ -400,14 +405,15 @@ export default function AdminFullPhaseConfig() {
       routeId: tripRouteId,
       vehicleId: tripVehicleId,
       driverId: tripDriverId,
-      date: eventDate,
+      date: targetDate,
       departureTime: tripDepartureTime,
     });
   };
 
   const handleBatchGenerateTrips = async () => {
-    if (!tripRouteId || !tripVehicleId || !tripDriverId || !eventDate) {
-      toast.error('Veuillez configurer un itinéraire, un véhicule et un chauffeur pour le générateur');
+    const targetDate = tripDate || eventDate;
+    if (!tripRouteId || !tripVehicleId || !tripDriverId || !targetDate) {
+      toast.error('Veuillez configurer un itinéraire, un véhicule, un chauffeur et une date pour le générateur');
       return;
     }
 
@@ -420,7 +426,7 @@ export default function AdminFullPhaseConfig() {
       timesToCreate.push(`${h}:${m}`);
     }
 
-    if (!window.confirm(`Confirmer la création en série de ${timesToCreate.length} départs (${timesToCreate.join(', ')}) ?`)) {
+    if (!window.confirm(`Confirmer la création en série de ${timesToCreate.length} départs le ${formatDate(targetDate)} (${timesToCreate.join(', ')}) ?`)) {
       return;
     }
 
@@ -432,7 +438,7 @@ export default function AdminFullPhaseConfig() {
           routeId: tripRouteId,
           vehicleId: tripVehicleId,
           driverId: tripDriverId,
-          date: eventDate,
+          date: targetDate,
           departureTime: timeStr,
         });
         createdCount++;
@@ -1437,6 +1443,18 @@ export default function AdminFullPhaseConfig() {
                       </p>
                     )}
                   </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-primary" /> Date de Circulation de la Navette
+                  </Label>
+                  <Input
+                    type="date"
+                    value={tripDate}
+                    onChange={(e) => setTripDate(e.target.value)}
+                    className="font-medium"
+                  />
                 </div>
 
                 {tripCreationMode === 'SINGLE' ? (
