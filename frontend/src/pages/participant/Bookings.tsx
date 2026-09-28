@@ -34,13 +34,12 @@ export default function ParticipantBookings() {
   const [step, setStep] = useState<Step>('select-event');
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [selectedPickupPointId, setSelectedPickupPointId] = useState<string | null>(null);
-  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
   const [passengerCount, setPassengerCount] = useState(1);
   const [contactPhone, setContactPhone] = useState(user?.phone || '');
   const [pickupLat, setPickupLat] = useState<number | null>(null);
   const [pickupLng, setPickupLng] = useState<number | null>(null);
   const [pickupAddress, setPickupAddress] = useState('');
-  const [pickupTimeOnly, setPickupTimeOnly] = useState('08:30');
+  const [pickupTime, setPickupTime] = useState('');
   const [matches, setMatches] = useState<any[]>([]);
   const [showMatches, setShowMatches] = useState(false);
   const [searching, setSearching] = useState('');
@@ -63,17 +62,12 @@ export default function ParticipantBookings() {
     enabled: !!selectedEvent,
   });
 
-  const { data: tripsData } = useQuery({
-    queryKey: ['trips-event-list', selectedEvent],
+  const { data: allTripsData } = useQuery({
+    queryKey: ['trips-list'],
     queryFn: () => tripsApi.getAll({ limit: 100 }).then((r) => r.data),
-    enabled: !!selectedEvent,
   });
-  const allTrips = tripsData?.data || [];
-  const eventTrips = allTrips.filter(
-    (t: any) =>
-      (t.route?.eventId === selectedEvent || t.route?.event?.id === selectedEvent) &&
-      t.status !== 'CANCELLED'
-  );
+  const allTrips = allTripsData?.data || [];
+  const eventTrips = allTrips.filter((t: any) => t.route?.eventId === selectedEvent);
 
   const bookedEventIds = new Set(
     (Array.isArray(myReservations) ? myReservations : [])
@@ -82,6 +76,18 @@ export default function ParticipantBookings() {
   );
 
   const selectedEventObj = events?.data?.find((e: any) => e.id === selectedEvent);
+
+  // Determine fixed departure date from scheduled trips or event date
+  const scheduledTripDate = eventTrips[0]?.date ? new Date(eventTrips[0].date).toISOString().split('T')[0] : null;
+  const fixedDepartureDate = scheduledTripDate || (selectedEventObj?.date ? new Date(selectedEventObj.date).toISOString().split('T')[0] : '');
+
+  const scheduledDepartureTimes: string[] = Array.from(
+    new Set<string>(
+      eventTrips
+        .map((t: any) => t.departureTime?.slice(0, 5))
+        .filter((t: any): t is string => Boolean(t))
+    )
+  ).sort();
 
   const bookMutation = useMutation({
     mutationFn: (data: any) => reservationsApi.create(data),
@@ -110,19 +116,17 @@ export default function ParticipantBookings() {
 
   const handleMatching = useCallback(
     async (reservation: any) => {
-      if (!pickupLat || !pickupLng || !pickupTimeOnly || !selectedEventObj) {
+      if (!pickupLat || !pickupLng || !pickupTime) {
         navigate('/participant/tickets');
         return;
       }
-      const eventDateStr = selectedEventObj.date ? selectedEventObj.date.split('T')[0] : '';
-      const combinedIso = `${eventDateStr}T${pickupTimeOnly.slice(0, 5)}:00.000Z`;
       try {
         setSearching('Searching for shared group shuttles near your pickup point...');
         const res = await reservationsApi.findMatches({
           eventId: selectedEvent,
           lat: pickupLat,
           lng: pickupLng,
-          pickupTime: combinedIso,
+          pickupTime,
           passengerCount,
           excludeReservationId: reservation?.id,
         });
@@ -143,11 +147,11 @@ export default function ParticipantBookings() {
         navigate('/participant/tickets');
       }
     },
-    [pickupLat, pickupLng, pickupTimeOnly, passengerCount, selectedEvent, selectedEventObj, navigate]
+    [pickupLat, pickupLng, pickupTime, passengerCount, selectedEvent, navigate]
   );
 
   const handleBook = async () => {
-    if (!selectedEvent || !selectedEventObj) {
+    if (!selectedEvent) {
       toast.error('Please select an event');
       return;
     }
@@ -155,24 +159,23 @@ export default function ParticipantBookings() {
       toast.error('Please select an official station or detect your GPS location');
       return;
     }
-    if (!pickupTimeOnly) {
+    if (!pickupTime) {
       toast.error('Please select your preferred pickup time');
       return;
     }
 
-    const eventDateStr = selectedEventObj.date ? selectedEventObj.date.split('T')[0] : '';
-    const timeStr = pickupTimeOnly.slice(0, 5);
-    const combinedIso = `${eventDateStr}T${timeStr}:00.000Z`;
+    const pickupDateObj = new Date(pickupTime);
+    const dateStr = pickupDateObj.toISOString().split('T')[0];
+    const timeStr = pickupDateObj.toTimeString().slice(0, 5);
 
     bookMutation.mutate({
       eventId: selectedEvent,
-      tripId: selectedTripId || undefined,
       pickupPointId: selectedPickupPointId || undefined,
       pickupLat: Number(pickupLat),
       pickupLng: Number(pickupLng),
       pickupAddress: pickupAddress || 'Custom GPS Pickup Location',
-      pickupTime: combinedIso,
-      date: eventDateStr,
+      pickupTime,
+      date: dateStr,
       time: timeStr,
       passengerCount: Number(passengerCount),
       contactPhone: contactPhone || undefined,
@@ -187,13 +190,12 @@ export default function ParticipantBookings() {
   const resetForm = () => {
     setSelectedEvent(null);
     setSelectedPickupPointId(null);
-    setSelectedTripId(null);
     setPassengerCount(1);
     setContactPhone(user?.phone || '');
     setPickupLat(null);
     setPickupLng(null);
     setPickupAddress('');
-    setPickupTimeOnly('08:30');
+    setPickupTime('');
     setNotes('');
     setMatches([]);
     setShowMatches(false);
@@ -205,9 +207,12 @@ export default function ParticipantBookings() {
       return;
     }
     setSelectedEvent(event.id);
-    setSelectedTripId(null);
-    const timePart = event.startTime ? event.startTime.slice(0, 5) : '08:30';
-    setPickupTimeOnly(timePart);
+    const eventTripsForThis = allTrips.filter((t: any) => t.route?.eventId === event.id);
+    const dateStr = eventTripsForThis[0]?.date
+      ? new Date(eventTripsForThis[0].date).toISOString().split('T')[0]
+      : (event.date ? new Date(event.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+    const timeStr = eventTripsForThis[0]?.departureTime?.slice(0, 5) || event.startTime?.slice(0, 5) || '08:30';
+    setPickupTime(`${dateStr}T${timeStr}`);
     setStep('select-pickup');
   };
 
@@ -566,71 +571,59 @@ export default function ParticipantBookings() {
                   </div>
                 </div>
 
-                {/* Pickup Schedule (Locked Event Date & Time Selection) */}
-                <div className="space-y-3 pt-1">
-                  {/* Fixed Event Departure Date */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-[#ffac00]" />
-                        Date de Circulation de la Navette
-                      </label>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-md">
-                        <Lock className="h-2.5 w-2.5 text-[#629b5c]" />
-                        Date Fixe
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/70 dark:bg-neutral-900/80 cursor-not-allowed">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-[#ffac00]/20 text-[#ffac00] flex items-center justify-center font-bold shrink-0">
-                          <Calendar className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-black text-neutral-950 dark:text-white">
-                            {selectedEventObj.date ? formatDate(selectedEventObj.date) : 'Date officielle'}
-                          </p>
-                          <p className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400">
-                            {selectedEventObj.date ? selectedEventObj.date.split('T')[0] : ''} • Date verrouillée par l'événement
-                          </p>
-                        </div>
-                      </div>
-                      <Lock className="h-4 w-4 text-neutral-400 shrink-0" />
-                    </div>
+                {/* Pickup Schedule Statebar & Time Picker */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-[#ffac00]" />
+                      Pickup Schedule & Departure
+                    </label>
                   </div>
 
-                  {/* Scheduled Departures (if available) */}
-                  {eventTrips.length > 0 && (
+                  {/* Fixed Date Statebar (Non-editable) */}
+                  <div className="p-3 sm:p-3.5 rounded-2xl bg-neutral-100/90 dark:bg-neutral-900/90 border border-neutral-200 dark:border-neutral-800 space-y-1.5 shadow-2xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                        <Calendar className="h-3 w-3 text-primary" /> Date de Circulation de la Navette
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20 shrink-0">
+                        <Lock className="h-2.5 w-2.5" /> Date Fixe (Organisateur)
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-black font-mono text-neutral-950 dark:text-white">
+                      {fixedDepartureDate ? formatDate(fixedDepartureDate) : 'Date fixée par l\'événement'}
+                    </p>
+                    <p className="text-[10px] text-neutral-400">
+                      La date du trajet est prédéfinie selon la programmation officielle des navettes (non modifiable).
+                    </p>
+                  </div>
+
+                  {/* Scheduled Departure Time Slots (if created by Admin) */}
+                  {scheduledDepartureTimes.length > 0 && (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
-                        <Bus className="h-3.5 w-3.5 text-blue-500" />
-                        Navettes Programmées ({eventTrips.length})
+                      <label className="text-[10px] font-bold uppercase text-neutral-500 dark:text-neutral-400 block">
+                        Horaires officiels programmés :
                       </label>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                        {eventTrips.map((t: any) => {
-                          const tripDepTime = t.departureTime ? t.departureTime.slice(0, 5) : '';
-                          const isSelected = selectedTripId === t.id || pickupTimeOnly === tripDepTime;
+                      <div className="flex flex-wrap gap-1.5">
+                        {scheduledDepartureTimes.map((timeStr) => {
+                          const currentTime = pickupTime.includes('T') ? pickupTime.split('T')[1].slice(0, 5) : '';
+                          const isSelected = currentTime === timeStr;
                           return (
                             <button
-                              key={t.id}
+                              key={timeStr}
                               type="button"
                               onClick={() => {
-                                setSelectedTripId(t.id);
-                                if (tripDepTime) setPickupTimeOnly(tripDepTime);
+                                const targetDate = fixedDepartureDate || (selectedEventObj?.date ? new Date(selectedEventObj.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                                setPickupTime(`${targetDate}T${timeStr}`);
                               }}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 ${
+                              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 ${
                                 isSelected
-                                  ? 'bg-[#ffac00] text-neutral-950 shadow-xs ring-2 ring-[#ffac00]/40'
+                                  ? 'bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs scale-105'
                                   : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'
                               }`}
                             >
-                              <Clock className="h-3 w-3" />
-                              {tripDepTime}
-                              {t.vehicle?.busNumber && (
-                                <span className="text-[10px] opacity-80 font-normal">
-                                  ({t.vehicle.busNumber})
-                                </span>
-                              )}
+                              <Bus className="h-3 w-3 text-[#ffac00]" />
+                              {timeStr}
                             </button>
                           );
                         })}
@@ -638,20 +631,19 @@ export default function ParticipantBookings() {
                     </div>
                   )}
 
-                  {/* Pickup Time Picker */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-blue-500" />
-                      Heure Souhaitée de Ramassage
+                  {/* Exact Time Input (locked to the fixed date) */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-neutral-500 dark:text-neutral-400 block">
+                      Heure de départ souhaitée :
                     </label>
                     <input
                       type="time"
-                      value={pickupTimeOnly}
+                      value={pickupTime.includes('T') ? pickupTime.split('T')[1].slice(0, 5) : '08:30'}
                       onChange={(e) => {
-                        setPickupTimeOnly(e.target.value);
-                        setSelectedTripId(null);
+                        const targetDate = fixedDepartureDate || (selectedEventObj?.date ? new Date(selectedEventObj.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                        setPickupTime(`${targetDate}T${e.target.value}`);
                       }}
-                      className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2.5 text-xs font-mono font-bold text-neutral-950 dark:text-white focus:border-[#ffac00] focus:outline-none"
+                      className="w-full rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 px-3 py-2 text-xs font-mono font-bold text-neutral-900 dark:text-white focus:border-[#ffac00] focus:outline-none"
                     />
                   </div>
                 </div>
