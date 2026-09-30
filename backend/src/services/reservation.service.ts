@@ -261,7 +261,7 @@ export class ReservationService {
       const existingTrip = await prisma.trip.findFirst({
         where: {
           route: { eventId: data.eventId },
-          status: { in: ['SCHEDULED', 'IN_PROGRESS', 'PENDING'] },
+          status: { in: ['SCHEDULED', 'IN_PROGRESS', 'DELAYED'] },
         },
         orderBy: { departureTime: 'asc' },
       });
