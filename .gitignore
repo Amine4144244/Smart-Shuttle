@@ -15,3 +15,5 @@ coverage/
 .serena/
 .agents/
 *.timestamp-*.mjs
+graphify-out/
+graphify/
