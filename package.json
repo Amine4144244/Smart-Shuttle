@@ -2,9 +2,13 @@
   "name": "smart-shuttle-monorepo",
   "private": true,
   "scripts": {
-    "build": "npm --prefix frontend run build",
-    "install:all": "npm --prefix frontend install && npm --prefix backend install"
+    "build": "npm --prefix backend run db:generate && npm --prefix frontend run build",
+    "vercel-build": "npm --prefix backend run db:generate && npm --prefix frontend run build"
   },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "engines": {
     "node": ">=18.x"
   }

@@ -37,7 +37,12 @@ app.use(compression());
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    const isAllowed = config.allowedOrigins.includes(origin) || config.allowedOrigins.includes('*');
+    const isAllowed =
+      config.allowedOrigins.includes(origin) ||
+      config.allowedOrigins.includes('*') ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1');
     if (isAllowed) {
       callback(null, true);
     } else {
