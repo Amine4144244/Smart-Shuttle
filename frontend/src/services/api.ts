@@ -2,7 +2,10 @@ import axios from 'axios';
 import { supabase } from '@/lib/supabase';
 
 const DEFAULT_API_URL = '/api';
-const API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+let API_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+if (import.meta.env.PROD && (API_URL.includes('localhost') || API_URL.includes('127.0.0.1'))) {
+  API_URL = '/api';
+}
 
 export const api = axios.create({
   baseURL: API_URL,
